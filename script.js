@@ -5,7 +5,6 @@ let chatHistory = [];
 let currentSlot = 1; 
 let isTyping = false; 
 
-// 获取网页元素
 const setupContainer = document.getElementById('setup-container');
 const gameContainer = document.getElementById('game-container');
 const storyDisplay = document.getElementById('story-display');
@@ -13,12 +12,10 @@ const playerInput = document.getElementById('player-input');
 const sendBtn = document.getElementById('send-btn');
 const startGameBtn = document.getElementById('start-game-btn');
 
-// 初始化检查 Key 记忆
 if(localStorage.getItem('my_ai_game_key')) {
     document.getElementById('api-key-input').value = localStorage.getItem('my_ai_game_key');
 }
 
-// 主菜单快捷读档
 function quickLoad(slot) {
     const saved = localStorage.getItem(`ai_story_slot_${slot}`);
     const key = document.getElementById('api-key-input').value.trim() || localStorage.getItem('my_ai_game_key');
@@ -36,7 +33,6 @@ function quickLoad(slot) {
     loadGameFromSlot(slot);
 }
 
-// 开启全新游戏
 startGameBtn.addEventListener('click', async () => {
     if(isTyping) return;
     apiKey = document.getElementById('api-key-input').value.trim();
@@ -50,7 +46,6 @@ startGameBtn.addEventListener('click', async () => {
     }
     localStorage.setItem('my_ai_game_key', apiKey);
 
-    // 重新定制的强约束提示词
     chatHistory = [
         {
             role: "system",
@@ -75,30 +70,32 @@ DATA_START{"hp":"生命值数值","inv":"当前全部装备道具","loc":"当前
     gameContainer.style.display = 'block';
     storyDisplay.innerHTML = ""; 
 
-    const loadingId = appendMessage('system', '⏳ 正在全速构建高精度游戏世界...');
+    const loadingId = appendSystemMessage('⏳ 正在全速构建高精度游戏世界...');
     await getAIResponse(loadingId);
 });
 
-// 发送指令
 sendBtn.addEventListener('click', handlePlayerTurn);
 playerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handlePlayerTurn(); });
 
+// 【核心修改：玩家回合】
 async function handlePlayerTurn() {
     if (isTyping) return; 
     const action = playerInput.value.trim();
     if (!action) return;
 
-    appendMessage('user', `> ${action}`);
     playerInput.value = '';
 
+    // 1. 创建一个新的剧情块（包含本次玩家输入，等待AI回复填充）
+    const blockId = createStoryBlock(`> ${action}`);
+    
     chatHistory.push({ role: "user", content: action });
-    const loadingId = appendMessage('system', '⚡ 推演环境中...');
+    const loadingId = appendSystemMessage('⚡ 推演环境中...');
 
-    await getAIResponse(loadingId);
+    await getAIResponse(loadingId, blockId);
 }
 
 // 连线并解析结果
-async function getAIResponse(loadingId) {
+async function getAIResponse(loadingId, blockId = null) {
     try {
         const response = await fetch(apiUrl, {
             method: 'POST',
@@ -120,24 +117,29 @@ async function getAIResponse(loadingId) {
             document.getElementById(loadingId).remove();
         }
 
-        // 提取并剥离后台数据
         let cleanStory = rawContent;
         const dataMatch = rawContent.match(/DATA_START([\s\S]*?)DATA_END/);
         
         if (dataMatch) {
-            // 抓到了 JSON 数据，丢给专门的更新函数
             updateStatusBar(dataMatch[1]);
-            // 把这串丑陋的代码从纯剧情文本中删掉，不污染玩家眼睛
             cleanStory = rawContent.replace(/DATA_START([\s\S]*?)DATA_END/, '').trim();
         }
 
-        // 极速输出纯剧情
-        await appendMessageWithFastTypewriter('assistant', cleanStory);
+        // 2. 如果是第一局没有 blockId，就新建一个只有 AI 回复的块
+        if (!blockId) {
+            blockId = createStoryBlock("【序章：命运的起点】");
+        }
 
-        // 存入记忆
+        // 3. 把 AI 的纯剧情飞速灌进这个盒子里
+        const blockDiv = document.getElementById(blockId);
+        const aiDiv = blockDiv.querySelector('.ai-response');
+        await appendTextWithFastTypewriter(aiDiv, cleanStory);
+
         chatHistory.push({ role: "assistant", content: rawContent });
         
-        // 每步自动存盘
+        // 4. 【核心升级】：每次打完字，立刻重新清点全场盒子，进行“折叠管理”
+        refreshCollapsibleBlocks();
+
         localStorage.setItem(`ai_story_slot_${currentSlot}`, JSON.stringify(chatHistory));
 
     } catch (error) {
@@ -148,42 +150,61 @@ async function getAIResponse(loadingId) {
     }
 }
 
-// 更新顶部状态栏的魔术函数
-function updateStatusBar(jsonStr) {
-    try {
-        const status = JSON.parse(jsonStr.trim());
-        if(status.hp) document.getElementById('status-hp').innerText = status.hp;
-        if(status.inv) document.getElementById('status-inv').innerText = status.inv;
-        if(status.loc) document.getElementById('status-loc').innerText = status.loc;
-    } catch(e) {
-        console.log("数据解析出了点小碎屑", e);
-    }
+// =================【核心升级：动态生成组装一个剧情大组合盒子】=================
+function createStoryBlock(userText) {
+    const blockId = 'block-' + Date.now();
+    const blockDiv = document.createElement('div');
+    blockDiv.id = blockId;
+    blockDiv.className = 'story-block';
+    
+    // 盒子里包含：上层的玩家行动行，以及下层留给AI回复的空白行
+    blockDiv.innerHTML = `
+        <div class="user-action">${userText}</div>
+        <div class="ai-response"></div>
+    `;
+    
+    // 给玩家输入行绑定一个点击事件：如果以后被贴上了“可折叠”标签，点它就能切换开关
+    blockDiv.querySelector('.user-action').addEventListener('click', () => {
+        if (blockDiv.classList.contains('collapsible')) {
+            blockDiv.classList.toggle('collapsed');
+        }
+    });
+    
+    storyDisplay.appendChild(blockDiv);
+    storyDisplay.scrollTop = storyDisplay.scrollHeight;
+    return blockId;
 }
 
-function appendMessage(role, text) {
-    const msgDiv = document.createElement('div');
-    const id = 'msg-' + Date.now();
-    msgDiv.id = id;
-    msgDiv.className = `message ${role}`;
-    msgDiv.innerText = text;
-    storyDisplay.appendChild(msgDiv);
-    storyDisplay.scrollTop = storyDisplay.scrollHeight; 
-    return id;
+// =================【核心升级：清点全场盒子，只留最后5个展开】=================
+function refreshCollapsibleBlocks() {
+    const allBlocks = document.querySelectorAll('.story-block');
+    const total = allBlocks.length;
+    
+    allBlocks.forEach((block, index) => {
+        // 如果这个盒子排在倒数第5个之前（代表是老剧情了）
+        if (index < total - 5) {
+            // 如果它还没被设置过折叠，就给它套上折叠皮肤，并默认闭合(collapsed)
+            if (!block.classList.contains('collapsible')) {
+                block.classList.add('collapsible');
+                block.classList.add('collapsed');
+            }
+        } else {
+            // 如果是最近的5个盒子，确保它们不带有折叠属性，保持完全展开
+            block.classList.remove('collapsible');
+            block.classList.remove('collapsed');
+        }
+    });
 }
 
-// 【全面加速：群组式滑行打字特效】
-function appendMessageWithFastTypewriter(role, text) {
+// 极速打字渲染
+function appendTextWithFastTypewriter(targetElement, text) {
     return new Promise((resolve) => {
         isTyping = true;
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `message ${role}`;
-        storyDisplay.appendChild(msgDiv);
-        
         let index = 0;
-        const charsPerTick = 4; // 核心改动：每次不再只蹦1个字，而是同时蹦4个字
+        const charsPerTick = 4; 
         
         const timer = setInterval(() => {
-            msgDiv.innerText += text.substr(index, charsPerTick);
+            targetElement.innerText += text.substr(index, charsPerTick);
             index += charsPerTick;
             storyDisplay.scrollTop = storyDisplay.scrollHeight; 
             
@@ -192,21 +213,33 @@ function appendMessageWithFastTypewriter(role, text) {
                 isTyping = false;
                 resolve();
             }
-        }, 15); // 触发间隔从 25ms 缩短到 15ms，双重加速！
+        }, 15); 
     });
 }
 
-// 绑定管理按钮
-document.getElementById('save-btn-1').addEventListener('click', () => { manualSave(1); });
-document.getElementById('save-btn-2').addEventListener('click', () => { manualSave(2); });
-document.getElementById('save-btn-3').addEventListener('click', () => { manualSave(3); });
-
-function manualSave(slot) {
-    currentSlot = slot;
-    localStorage.setItem(`ai_story_slot_${slot}`, JSON.stringify(chatHistory));
-    alert(`💾 进度已覆盖保存在槽位【${slot}】。`);
+function updateStatusBar(jsonStr) {
+    try {
+        const status = JSON.parse(jsonStr.trim());
+        if(status.hp) document.getElementById('status-hp').innerText = status.hp;
+        if(status.inv) document.getElementById('status-inv').innerText = status.inv;
+        if(status.loc) document.getElementById('status-loc').innerText = status.loc;
+    } catch(e) {
+        console.log("数据同步轻微溢出", e);
+    }
 }
 
+function appendSystemMessage(text) {
+    const msgDiv = document.createElement('div');
+    const id = 'sys-' + Date.now();
+    msgDiv.id = id;
+    msgDiv.className = 'system-msg';
+    msgDiv.innerText = text;
+    storyDisplay.appendChild(msgDiv);
+    storyDisplay.scrollTop = storyDisplay.scrollHeight; 
+    return id;
+}
+
+// 读档还原
 function loadGameFromSlot(slot) {
     const saved = localStorage.getItem(`ai_story_slot_${slot}`);
     if (!saved) return;
@@ -216,21 +249,38 @@ function loadGameFromSlot(slot) {
     gameContainer.style.display = 'block';
     storyDisplay.innerHTML = ""; 
     
+    let tempUserText = "【序章：重新连接】";
+    
     chatHistory.forEach(msg => {
-        if (msg.role !== 'system') {
+        if (msg.role === 'user') {
+            tempUserText = `> ${msg.content}`;
+        } else if (msg.role === 'assistant') {
             let cleanText = msg.content;
             const dataMatch = msg.content.match(/DATA_START([\s\S]*?)DATA_END/);
             if (dataMatch) {
-                if(msg === chatHistory[chatHistory.length - 1] || msg.role === 'assistant') {
-                    updateStatusBar(dataMatch[1]); // 恢复最后一次的数据
-                }
+                updateStatusBar(dataMatch[1]);
                 cleanText = msg.content.replace(/DATA_START([\s\S]*?)DATA_END/, '').trim();
             }
-            const prefix = msg.role === 'user' ? '> ' : '';
-            appendMessage(msg.role, prefix + cleanText);
+            
+            // 恢复时，根据当时的一问一答，组合塞进大盒子里
+            const blockId = createStoryBlock(tempUserText);
+            document.getElementById(blockId).querySelector('.ai-response').innerText = cleanText;
         }
     });
-    appendMessage('system', `💾 已无缝跃迁至进度【${slot}】。`);
+    
+    // 还原后同样立刻刷新全场的折叠状态
+    refreshCollapsibleBlocks();
+    appendSystemMessage(`💾 成功跃迁回时空节点【${slot}】。`);
+}
+
+document.getElementById('save-btn-1').addEventListener('click', () => { manualSave(1); });
+document.getElementById('save-btn-2').addEventListener('click', () => { manualSave(2); });
+document.getElementById('save-btn-3').addEventListener('click', () => { manualSave(3); });
+
+function manualSave(slot) {
+    currentSlot = slot;
+    localStorage.setItem(`ai_story_slot_${slot}`, JSON.stringify(chatHistory));
+    alert(`💾 进度已强制同步到槽位【${slot}】。`);
 }
 
 document.getElementById('del-btn-all').addEventListener('click', () => {
