@@ -48,22 +48,71 @@
         .start-btn { width: 100%; background: var(--accent-color); color: #000; border: none; padding: 16px; font-size: 16px; font-weight: 700; cursor: pointer; border-radius: 8px; margin-top: 15px; transition: all 0.25s ease; }
         .start-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px var(--accent-glow); background: #26ffe6; }
         
-        #game-container { display: none; padding-top: 25px; }
+        #game-container { display: none; padding-top: 25px; position: relative; }
 
+        /* ======【状态栏重构：精简布局】====== */
         .status-bar { 
             display: grid; 
-            grid-template-columns: 1fr 2fr 1fr; 
+            grid-template-columns: 2fr 1fr 1fr; 
             background: #1f212a; 
-            padding: 15px 20px; 
+            padding: 12px 20px; 
             border-radius: 10px; 
             margin-bottom: 20px; 
             border: 1px solid #2d313f;
             font-size: 13px;
+            align-items: center;
         }
         .status-item { display: flex; flex-direction: column; gap: 4px; }
         .status-label { color: var(--text-muted); font-size: 11px; font-weight: bold; text-transform: uppercase; }
-        .status-value { color: #fff; font-weight: 600; }
-        #status-hp { color: #ff4757; }
+        .status-value { color: #fff; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* 互动图标按钮样式 */
+        .icon-btn {
+            background: #252834;
+            border: 1px solid #2d313f;
+            color: #fff;
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .icon-btn:hover {
+            border-color: var(--accent-color);
+            background: rgba(0, 255, 204, 0.1);
+        }
+
+        /* ======【悬浮抽屉/弹窗样式】====== */
+        .info-modal {
+            display: none;
+            position: absolute;
+            top: 105px;
+            left: 35px;
+            right: 35px;
+            background: #1c1e27;
+            border: 1px solid var(--accent-color);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.7), 0 0 15px var(--accent-glow);
+            border-radius: 10px;
+            padding: 20px;
+            z-index: 100;
+            box-sizing: border-box;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #2d313f;
+            padding-bottom: 8px;
+        }
+        .modal-title { color: var(--accent-color); font-weight: bold; font-size: 15px; }
+        .modal-close { color: var(--text-muted); cursor: pointer; font-size: 18px; }
+        .modal-close:hover { color: #ff4757; }
+        .modal-body { font-size: 14px; line-height: 1.6; color: #edf2f7; white-space: pre-wrap; max-height: 150px; overflow-y: auto; }
 
         .control-bar { display: flex; justify-content: space-between; margin-bottom: 15px; }
         .btn-group { display: flex; gap: 8px; }
@@ -81,14 +130,13 @@
         #player-input { flex: 1; background: transparent; border: none; color: #fff; padding: 10px; font-size: 16px; outline: none; font-family: inherit; }
         #send-btn { background: var(--accent-color); color: #000; border: none; padding: 0 24px; font-size: 15px; font-weight: 700; cursor: pointer; border-radius: 6px; }
 
-        /* =================【核心升级：折叠剧情盒子样式】================= */
+        /* 剧情盒子样式 */
         .story-block { 
             margin-bottom: 15px; 
             border-bottom: 1px solid #1a1c23; 
             padding-bottom: 15px; 
         }
         
-        /* 玩家输入行（作为折叠按钮） */
         .user-action { 
             color: var(--user-color); 
             border-left: 3px solid var(--user-color); 
@@ -97,7 +145,6 @@
             margin-bottom: 8px;
         }
         
-        /* 当旧回合被折叠时，玩家输入行允许点击，并添加提示小手 */
         .collapsible .user-action {
             cursor: pointer;
             transition: color 0.2s;
@@ -105,7 +152,6 @@
         .collapsible .user-action:hover {
             color: #ff4da6;
         }
-        /* 给折叠状态下的行动加上暗号暗示可以点击 */
         .collapsible .user-action::after {
             content: ' 📄 (已折叠·点击展开)';
             font-size: 11px;
@@ -113,7 +159,6 @@
             font-weight: normal;
         }
         
-        /* AI 回复包 */
         .ai-response { 
             color: #edf2f7; 
             white-space: pre-wrap; 
@@ -121,11 +166,10 @@
             padding-left: 12px; 
             overflow: hidden;
             transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
-            max-height: 2000px; /* 默认展开很大 */
+            max-height: 2000px; 
             opacity: 1;
         }
 
-        /* 被折叠状态下的 AI 回复 */
         .collapsible.collapsed .ai-response {
             max-height: 0 !important;
             opacity: 0;
@@ -134,7 +178,6 @@
             margin: 0;
         }
         
-        /* 系统通知提示（不参与折叠） */
         .system-msg { color: var(--text-muted); font-style: italic; font-size: 13px; text-align: center; margin: 15px 0; }
     </style>
 </head>
@@ -173,20 +216,32 @@
 
     <!-- 界面二：游戏交互面板 -->
     <div id="game-container">
-        <!-- 顶部独立状态栏 -->
+        <!-- 顶部独立状态栏（精简优化版） -->
         <div class="status-bar">
-            <div class="status-item">
-                <span class="status-label">❤️ 生命值</span>
-                <span class="status-value" id="status-hp">100 / 100</span>
-            </div>
-            <div class="status-item">
-                <span class="status-label">🎒 携带装备与道具</span>
-                <span class="status-value" id="status-inv">无</span>
-            </div>
             <div class="status-item">
                 <span class="status-label">📍 当前位置</span>
                 <span class="status-value" id="status-loc">等待生成...</span>
             </div>
+            <button class="icon-btn" id="modal-inv-btn">🎒 装备道具</button>
+            <button class="icon-btn" id="modal-rel-btn">👥 人物关系</button>
+        </div>
+
+        <!-- 装备道具隐藏抽屉 -->
+        <div class="info-modal" id="modal-inv">
+            <div class="modal-header">
+                <span class="modal-title">🎒 随身随身携带的装备与道具</span>
+                <span class="modal-close" onclick="toggleModal('modal-inv', false)">✕</span>
+            </div>
+            <div class="modal-body" id="status-inv-box">暂无道具</div>
+        </div>
+
+        <!-- 人物关系隐藏抽屉 -->
+        <div class="info-modal" id="modal-rel">
+            <div class="modal-header">
+                <span class="modal-title">👥 当前已知的人物关系网络</span>
+                <span class="modal-close" onclick="toggleModal('modal-rel', false)">✕</span>
+            </div>
+            <div class="modal-body" id="status-rel-box">还未遇到重要角色，羁绊尚未建立...</div>
         </div>
 
         <!-- 存档控制 -->
