@@ -137,6 +137,51 @@ function loadGameFromSlot(slot) {
     refreshCollapsibleBlocks(); appendSystemMessage(`💾 成功跃迁回时空节点【${slot}】。`);
 }
 
+// 核心功能：一键将当前全部剧情打包生成纯净 TXT 小说文档
+function exportStory() {
+    if (!chatHistory || chatHistory.length <= 2) {
+        return alert("当前还没有任何冒险记录，无法导出！");
+    }
+    
+    let textOutput = `==================================================\n`;
+    textOutput += `        📜 《AI 文字冒险：我的命运回忆录》 📜        \n`;
+    textOutput += `==================================================\n`;
+    textOutput += `导出时间：${new Date().toLocaleString()}\n`;
+    textOutput += `当前存档：进度槽位 【${currentSlot}】\n`;
+    textOutput += `--------------------------------------------------\n\n`;
+
+    let turnNumber = 1;
+    chatHistory.forEach(msg => {
+        if (msg.role === 'system') return; // 自动跳过后台系统参数设定
+
+        if (msg.role === 'user') {
+            textOutput += `【第 ${turnNumber} 步 · 我的抉择】>\n${msg.content}\n\n`;
+            turnNumber++;
+        } else if (msg.role === 'assistant') {
+            // 核心清洗：自动精准剔除不可见的 DATA_START / DATA_END 数据，保留最纯净的小说剧情文本
+            let cleanNarrative = msg.content.replace(/DATA_START([\s\S]*?)DATA_END/, '').trim();
+            textOutput += `【世界的推演】:\n${cleanNarrative}\n`;
+            textOutput += `\n--------------------------------------------------\n\n`;
+        }
+    });
+
+    textOutput += `=== 剧本终 · 见证了你的伟大史诗 ===\n`;
+
+    try {
+        const blob = new Blob([textOutput], { type: "text/plain;charset=utf-8" });
+        const downloadUrl = URL.createObjectURL(blob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = downloadUrl;
+        downloadLink.download = `我的文字冒险回忆录_进度${currentSlot}_${new Date().toISOString().slice(0,10)}.txt`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        URL.revokeObjectURL(downloadUrl);
+    } catch (e) {
+        alert("浏览器限制了自动下载，请尝试在手机独立浏览器（如 Safari, Chrome, Edge）中打开此游戏。");
+    }
+}
+
 [1,2,3].forEach(slot => document.getElementById(`save-btn-${slot}`).addEventListener('click', () => { currentSlot = slot; localStorage.setItem(`ai_story_slot_${slot}`, JSON.stringify(chatHistory)); alert(`💾 已保存至槽位【${slot}】`); }));
 document.getElementById('del-btn-all').addEventListener('click', () => { if(confirm("销毁此档？")) { localStorage.removeItem(`ai_story_slot_${currentSlot}`); location.reload(); }});
 document.getElementById('back-menu-btn').addEventListener('click', () => { if(!isTyping) location.reload(); });
