@@ -16,6 +16,14 @@ if(localStorage.getItem('my_ai_game_key')) {
     document.getElementById('api-key-input').value = localStorage.getItem('my_ai_game_key');
 }
 
+// 补全：修复你的装备和关系面板点不开的问题
+function toggleModal(modalId, show) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = show ? 'block' : 'none';
+    }
+}
+
 function quickLoad(slot) {
     const saved = localStorage.getItem(`ai_story_slot_${slot}`);
     const key = document.getElementById('api-key-input').value.trim() || localStorage.getItem('my_ai_game_key');
@@ -58,7 +66,7 @@ startGameBtn.addEventListener('click', async () => {
 
 【状态面板数据同步规则】：
 在每次回复的最末尾，你必须严格按照以下格式附带一行数据（不要更改标签名字），用于更新网页顶部的状态栏。请根据剧情合理扣除或增加属性：
-DATA_START{"hp":"生命值数值","inv":"当前全部装备道具","loc":"当前精准位置"}DATA_END`
+DATA_START{"hp":"生命值","inv":"全部装备道具","rel":"重要人物关系","loc":"当前精准位置"}DATA_END`
         },
         {
             role: "system",
@@ -140,7 +148,6 @@ async function getAIResponse(loadingId, blockId = null) {
     }
 }
 
-// =================【重构：移除旧的单个监听器，改为全局高效组装】=================
 function createStoryBlock(userText) {
     const blockId = 'block-' + Date.now();
     const blockDiv = document.createElement('div');
@@ -157,7 +164,7 @@ function createStoryBlock(userText) {
     return blockId;
 }
 
-// 核心优化：采用最高效的全局事件委托。完美修复超长游玩导致手机端折叠失效、卡死的BUG
+// 全局高效事件委托：完美兼顾超长剧情的点击折叠
 storyDisplay.addEventListener('click', (e) => {
     const targetAction = e.target.closest('.user-action');
     if (!targetAction) return;
@@ -204,12 +211,13 @@ function appendTextWithFastTypewriter(targetElement, text) {
     });
 }
 
+// 升级版数据同步：智能适配你的模态弹窗盒子
 function updateStatusBar(jsonStr) {
     try {
         const status = JSON.parse(jsonStr.trim());
-        if(status.hp) document.getElementById('status-hp').innerText = status.hp;
-        if(status.inv) document.getElementById('status-inv').innerText = status.inv;
-        if(status.loc) document.getElementById('status-loc').innerText = status.loc;
+        if(status.loc && document.getElementById('status-loc')) document.getElementById('status-loc').innerText = status.loc;
+        if(status.inv && document.getElementById('status-inv-box')) document.getElementById('status-inv-box').innerText = status.inv;
+        if(status.rel && document.getElementById('status-rel-box')) document.getElementById('status-rel-box').innerText = status.rel;
     } catch(e) {
         console.log("数据同步轻微溢出", e);
     }
@@ -256,7 +264,7 @@ function loadGameFromSlot(slot) {
     appendSystemMessage(`💾 成功跃迁回时空节点【${slot}】。`);
 }
 
-// =================【核心优化：高兼容、零乱码文本导出回忆录功能】=================
+// =================【核心重构：高兼容、零乱码文本导出功能】=================
 document.getElementById('export-btn').addEventListener('click', () => {
     if (!chatHistory || chatHistory.length <= 2) {
         return alert("当前还没有可导出的冒险历史！");
@@ -284,18 +292,18 @@ document.getElementById('export-btn').addEventListener('click', () => {
 
     textOutput += `=== 剧本终 · 见证了你的伟大史诗 ===\n`;
 
-    // 强力防乱码处理：加入 UTF-8 BOM 头部标识 (\ufeff)
-    const blob = new Blob(["\ufeff" + textOutput], { type: "text/plain;charset=utf-8" });
-    const fileName = `我的冒险回忆录_进度${currentSlot}.txt`;
-
-    // 唤醒手机专用零乱码复制内嵌窗 (双保险方案，绝不漏掉任何剧情)
+    // 1. 保底机制：唤醒弹窗，并填充纯文本（用户可以在手机上直接全选复制，永不乱码）
     const modal = document.getElementById('export-modal');
     const textarea = document.getElementById('export-textarea');
-    textarea.value = textOutput;
-    modal.style.display = 'flex';
+    if (modal && textarea) {
+        textarea.value = textOutput;
+        modal.style.display = 'flex';
+    }
 
-    // 同时尝试静默触发原生的浏览器文件下载
+    // 2. 原生下载机制：加入 UTF-8 BOM 头部标识 (\ufeff) 强力防止直接下载产生的乱码
     try {
+        const blob = new Blob(["\ufeff" + textOutput], { type: "text/plain;charset=utf-8" });
+        const fileName = `我的冒险回忆录_进度${currentSlot}.txt`;
         const downloadUrl = URL.createObjectURL(blob);
         const downloadLink = document.createElement('a');
         downloadLink.href = downloadUrl;
@@ -305,25 +313,28 @@ document.getElementById('export-btn').addEventListener('click', () => {
         document.body.removeChild(downloadLink);
         URL.revokeObjectURL(downloadUrl);
     } catch (e) {
-        console.log("环境限制原生下载，已自动切换到安全的内嵌面板复制方案");
+        console.log("环境拦截原生下载，已自动展示零乱码安全复制弹窗");
     }
 });
 
-// 复制窗的按钮交互控制
+// 复制窗的内部控制逻辑
 document.getElementById('copy-text-btn').addEventListener('click', () => {
     const textarea = document.getElementById('export-textarea');
-    textarea.select();
-    textarea.setSelectionRange(0, 99999); // 兼容 iOS
-    try {
-        document.execCommand('copy');
-        alert('✨ 剧情文本已全选并成功复制到你的手机剪贴板！可以直接去粘贴保存啦。');
-    } catch (err) {
-        alert('请长按文本框内的文字进行手动全选复制。');
+    if (textarea) {
+        textarea.select();
+        textarea.setSelectionRange(0, 99999); // 兼容 iOS
+        try {
+            document.execCommand('copy');
+            alert('✨ 剧情文本已全选并成功复制到你的手机剪贴板！可以直接去微信或便签里粘贴啦。');
+        } catch (err) {
+            alert('请长按文本框内的文字进行手动全选复制。');
+        }
     }
 });
 
 document.getElementById('close-export-btn').addEventListener('click', () => {
-    document.getElementById('export-modal').style.display = 'none';
+    const modal = document.getElementById('export-modal');
+    if (modal) modal.style.display = 'none';
 });
 
 // 基础存档绑定

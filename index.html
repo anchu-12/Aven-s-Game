@@ -15,18 +15,20 @@
         textarea { height: 90px; resize: none; }
         .start-btn { width: 100%; background: var(--accent-color); color: #000; border: none; padding: 16px; font-size: 16px; font-weight: 700; cursor: pointer; border-radius: 8px; margin-top: 15px; }
         #game-container { display: none; padding-top: 25px; position: relative; }
-        /* 顶部状态栏：调整为4列自适应，腾出空间给导出按钮 */
+        
         .status-bar { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; background: #1f212a; padding: 12px 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #2d313f; font-size: 12px; align-items: center; gap: 8px; }
         .status-item { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
         .status-label { color: var(--text-muted); font-size: 11px; font-weight: bold; }
         .status-value { color: #fff; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .icon-btn { background: #252834; border: 1px solid #2d313f; color: #fff; padding: 8px 4px; border-radius: 8px; cursor: pointer; font-size: 12px; transition: all 0.2s; text-align: center; white-space: nowrap; }
         .icon-btn:hover { border-color: var(--accent-color); }
+        
         .info-modal { display: none; position: absolute; top: 105px; left: 35px; right: 35px; background: #1c1e27; border: 1px solid var(--accent-color); box-shadow: 0 15px 30px rgba(0,0,0,0.7); border-radius: 10px; padding: 20px; z-index: 100; }
         .modal-header { display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid #2d313f; padding-bottom: 8px; }
         .modal-title { color: var(--accent-color); font-weight: bold; font-size: 15px; }
         .modal-close { color: var(--text-muted); cursor: pointer; font-size: 18px; }
         .modal-body { font-size: 14px; line-height: 1.6; color: #edf2f7; white-space: pre-wrap; max-height: 150px; overflow-y: auto; }
+        
         .control-bar { display: flex; justify-content: space-between; margin-bottom: 15px; }
         .btn-group { display: flex; gap: 8px; }
         .btn-sm { padding: 6px 14px; font-size: 12px; cursor: pointer; border: 1px solid #2d313f; background: #1f212a; color: var(--text-color); border-radius: 6px; }
@@ -35,13 +37,19 @@
         #input-container { display: flex; background: #1f212a; border-radius: 8px; padding: 6px; border: 1px solid #2d313f; }
         #player-input { flex: 1; background: transparent; border: none; color: #fff; padding: 10px; font-size: 16px; outline: none; }
         #send-btn { background: var(--accent-color); color: #000; border: none; padding: 0 24px; font-weight: 700; cursor: pointer; border-radius: 6px; }
+        
         .story-block { margin-bottom: 15px; border-bottom: 1px solid #1a1c23; padding-bottom: 15px; }
         .user-action { color: var(--user-color); border-left: 3px solid var(--user-color); padding-left: 12px; font-weight: 600; margin-bottom: 8px; }
+        
         .collapsible .user-action { cursor: pointer; }
-        .collapsible .user-action::after { content: ' 📄 (点击展开)'; font-size: 11px; color: var(--text-muted); }
+        .collapsible .user-action::after { content: ' 📄 (已折叠·点击展开)'; font-size: 11px; color: var(--text-muted); }
         .ai-response { color: #edf2f7; white-space: pre-wrap; border-left: 3px solid var(--accent-color); padding-left: 12px; overflow: hidden; transition: all 0.3s; max-height: 2000px; opacity: 1; }
         .collapsible.collapsed .ai-response { max-height: 0; opacity: 0; padding: 0; margin: 0; border: none; }
         .system-msg { color: var(--text-muted); font-style: italic; font-size: 13px; text-align: center; margin: 15px 0; }
+
+        /* 手机端专用零乱码强力复制模态弹窗样式 */
+        #export-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+        .modal-content-export { background: #16171d; width: 100%; max-width: 600px; border-radius: 12px; border: 1px solid #ffb300; padding: 20px; display: flex; flex-direction: column; gap: 15px; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -61,7 +69,7 @@
             <div class="status-item"><span class="status-label">📍 当前位置</span><span class="status-value" id="status-loc">等待生成...</span></div>
             <button class="icon-btn" id="modal-inv-btn" onclick="toggleModal('modal-inv', true)">🎒 装备</button>
             <button class="icon-btn" id="modal-rel-btn" onclick="toggleModal('modal-rel', true)">👥 关系</button>
-            <button class="icon-btn" id="export-btn" onclick="exportStory()" style="border-color: #ffb300; color: #ffb300;">📜 导出</button>
+            <button class="icon-btn" id="export-btn" style="border-color: #ffb300; color: #ffb300;">📜 导出</button>
         </div>
 
         <div class="info-modal" id="modal-inv">
@@ -81,6 +89,19 @@
         <div id="story-display"></div>
         <div id="input-container"><input type="text" id="player-input" placeholder="输入你的下一步行动..." autofocus><button id="send-btn">发送</button></div>
     </div>
-    <script src="script.js?v=4.0"></script>
+
+    <div id="export-modal">
+        <div class="modal-content-export">
+            <h3 style="margin: 0; color: #ffb300; text-align: center;">📜 我的纯净剧情文本</h3>
+            <p style="margin: 0; color: #64748b; font-size: 12px; text-align: center;">已成功注入 UTF-8 编码。长按框内文本全选复制，可安全存入便签。</p>
+            <textarea id="export-textarea" readonly style="width: 100%; height: 280px; background: #0f1015; border: 1px solid #2d313f; color: #edf2f7; padding: 12px; border-radius: 6px; font-size: 14px; resize: none; outline: none; box-sizing: border-box;"></textarea>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-sm" id="copy-text-btn" style="flex: 1; background: #ffb300; color: #000; font-weight: bold; padding: 10px;">一键全选文本</button>
+                <button class="btn-sm" id="close-export-btn" style="padding: 10px;">关闭窗口</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=9.99"></script>
 </body>
 </html>
