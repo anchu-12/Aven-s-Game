@@ -2,7 +2,7 @@ const apiUrl = "https://api.deepseek.com/v1/chat/completions";
 
 let apiKey = "";
 let chatHistory = [];
-let currentSlot = 1; 
+let currentSlot = null; // 核心优化 1：初始阶段不绑定任何槽位，新冒险保持空白状态
 let isTyping = false; 
 
 const setupContainer = document.getElementById('setup-container');
@@ -16,7 +16,6 @@ if(localStorage.getItem('my_ai_game_key')) {
     document.getElementById('api-key-input').value = localStorage.getItem('my_ai_game_key');
 }
 
-// 补全：修复你的装备和关系面板点不开的问题
 function toggleModal(modalId, show) {
     const modal = document.getElementById(modalId);
     if (modal) {
@@ -37,7 +36,7 @@ function quickLoad(slot) {
     }
     apiKey = key;
     localStorage.setItem('my_ai_game_key', apiKey);
-    currentSlot = slot;
+    currentSlot = slot; // 读档时会正常追踪目标槽位
     loadGameFromSlot(slot);
 }
 
@@ -53,6 +52,9 @@ startGameBtn.addEventListener('click', async () => {
         return;
     }
     localStorage.setItem('my_ai_game_key', apiKey);
+
+    // 核心优化 1.1：确保启动全新游戏时绝对脱离所有已有槽位
+    currentSlot = null;
 
     chatHistory = [
         {
@@ -138,7 +140,11 @@ async function getAIResponse(loadingId, blockId = null) {
 
         chatHistory.push({ role: "assistant", content: rawContent });
         refreshCollapsibleBlocks();
-        localStorage.setItem(`ai_story_slot_${currentSlot}`, JSON.stringify(chatHistory));
+
+        // 核心优化 1.2：只有当玩家手动存过档（或者是从已有槽位载入的），才进行自动追踪同步。新冒险绝不胡乱覆盖！
+        if (currentSlot !== null) {
+            localStorage.setItem(`ai_story_slot_${currentSlot}`, JSON.stringify(chatHistory));
+        }
 
     } catch (error) {
         console.error(error);
@@ -164,7 +170,6 @@ function createStoryBlock(userText) {
     return blockId;
 }
 
-// 全局高效事件委托：完美兼顾超长剧情的点击折叠
 storyDisplay.addEventListener('click', (e) => {
     const targetAction = e.target.closest('.user-action');
     if (!targetAction) return;
@@ -211,7 +216,6 @@ function appendTextWithFastTypewriter(targetElement, text) {
     });
 }
 
-// 升级版数据同步：智能适配你的模态弹窗盒子
 function updateStatusBar(jsonStr) {
     try {
         const status = JSON.parse(jsonStr.trim());
@@ -264,7 +268,6 @@ function loadGameFromSlot(slot) {
     appendSystemMessage(`💾 成功跃迁回时空节点【${slot}】。`);
 }
 
-// =================【核心重构：高兼容、零乱码文本导出功能】=================
 document.getElementById('export-btn').addEventListener('click', () => {
     if (!chatHistory || chatHistory.length <= 2) {
         return alert("当前还没有可导出的冒险历史！");
@@ -274,7 +277,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
     textOutput += `        📜 《AI 文字冒险：我的命运回忆录》 📜        \n`;
     textOutput += `==================================================\n`;
     textOutput += `导出时间：${new Date().toLocaleString()}\n`;
-    textOutput += `当前槽位：进度【${currentSlot}】\n`;
+    textOutput += `当前槽位：${currentSlot ? `进度【${currentSlot}】` : '暂未存档（新冒险）'}\n`; // 润色细节
     textOutput += `--------------------------------------------------\n\n`;
 
     let turnNumber = 1;
@@ -292,7 +295,6 @@ document.getElementById('export-btn').addEventListener('click', () => {
 
     textOutput += `=== 剧本终 · 见证了你的伟大史诗 ===\n`;
 
-    // 1. 保底机制：唤醒弹窗，并填充纯文本（用户可以在手机上直接全选复制，永不乱码）
     const modal = document.getElementById('export-modal');
     const textarea = document.getElementById('export-textarea');
     if (modal && textarea) {
@@ -300,10 +302,9 @@ document.getElementById('export-btn').addEventListener('click', () => {
         modal.style.display = 'flex';
     }
 
-    // 2. 原生下载机制：加入 UTF-8 BOM 头部标识 (\ufeff) 强力防止直接下载产生的乱码
     try {
         const blob = new Blob(["\ufeff" + textOutput], { type: "text/plain;charset=utf-8" });
-        const fileName = `我的冒险回忆录_进度${currentSlot}.txt`;
+        const fileName = `我的冒险回忆录_${currentSlot ? '进度'+currentSlot : '临时新篇'}.txt`;
         const downloadUrl = URL.createObjectURL(blob);
         const downloadLink = document.createElement('a');
         downloadLink.href = downloadUrl;
@@ -313,16 +314,15 @@ document.getElementById('export-btn').addEventListener('click', () => {
         document.body.removeChild(downloadLink);
         URL.revokeObjectURL(downloadUrl);
     } catch (e) {
-        console.log("环境拦截原生下载，已自动展示零乱码安全复制弹窗");
+        console.log("环境限制原生下载，已自动展示零乱码安全复制弹窗");
     }
 });
 
-// 复制窗的内部控制逻辑
 document.getElementById('copy-text-btn').addEventListener('click', () => {
     const textarea = document.getElementById('export-textarea');
     if (textarea) {
         textarea.select();
-        textarea.setSelectionRange(0, 99999); // 兼容 iOS
+        textarea.setSelectionRange(0, 99999); 
         try {
             document.execCommand('copy');
             alert('✨ 剧情文本已全选并成功复制到你的手机剪贴板！可以直接去微信或便签里粘贴啦。');
@@ -337,23 +337,22 @@ document.getElementById('close-export-btn').addEventListener('click', () => {
     if (modal) modal.style.display = 'none';
 });
 
-// 基础存档绑定
+// 绑定存档动作
 document.getElementById('save-btn-1').addEventListener('click', () => { manualSave(1); });
 document.getElementById('save-btn-2').addEventListener('click', () => { manualSave(2); });
 document.getElementById('save-btn-3').addEventListener('click', () => { manualSave(3); });
 
+// 核心优化 2：手动存储逻辑加入误触拦截
 function manualSave(slot) {
-    currentSlot = slot;
+    const isConfirmed = confirm(`⚠️ 是否确定要将当前进度保存到【进度 ${slot}】吗？\n此操作将无情覆盖该槽位原有的全部老剧情！`);
+    if (!isConfirmed) return; // 玩家反悔，安全撤回
+
+    currentSlot = slot; // 正式绑定该槽位
     localStorage.setItem(`ai_story_slot_${slot}`, JSON.stringify(chatHistory));
-    alert(`💾 进度已强制同步到槽位【${slot}】。`);
+    alert(`💾 进度已强制同步并绑定到槽位【${slot}】。`);
 }
 
-document.getElementById('del-btn-all').addEventListener('click', () => {
-    if(confirm(`确定销毁槽位【${currentSlot}】的数据吗？`)) {
-        localStorage.removeItem(`ai_story_slot_${currentSlot}`);
-        location.reload();
-    }
-});
+// 核心优化 3：删除了 del-btn-all 的相关逻辑事件监听
 
 document.getElementById('back-menu-btn').addEventListener('click', () => {
     if(isTyping) return;
