@@ -2,7 +2,7 @@ const apiUrl = "https://api.deepseek.com/v1/chat/completions";
 
 let apiKey = "";
 let chatHistory = [];
-let currentSlot = null; // 核心优化 1：初始阶段不绑定任何槽位，新冒险保持空白状态
+let currentSlot = null; // 初始阶段不绑定任何槽位，新冒险保持空白状态
 let isTyping = false; 
 
 const setupContainer = document.getElementById('setup-container');
@@ -36,7 +36,7 @@ function quickLoad(slot) {
     }
     apiKey = key;
     localStorage.setItem('my_ai_game_key', apiKey);
-    currentSlot = slot; // 读档时会正常追踪目标槽位
+    currentSlot = slot; 
     loadGameFromSlot(slot);
 }
 
@@ -53,18 +53,27 @@ startGameBtn.addEventListener('click', async () => {
     }
     localStorage.setItem('my_ai_game_key', apiKey);
 
-    // 核心优化 1.1：确保启动全新游戏时绝对脱离所有已有槽位
     currentSlot = null;
 
+    // ==========================================
+    // 🧠 核心算法更新：半主动推演与强上下文衔接内核
+    // ==========================================
     chatHistory = [
         {
             role: "system",
-            content: `你是一个顶级的纯场景叙事NPC和文字游戏环境渲染器。
-【核心行动守则——玩家主导】：
-1. 剧情的发展速度必须完全掌控在玩家手中。你绝对不主动推动时间流逝或剧情大跨步，严禁主动宣布“任务完成”、“成功逃脱”或直接转场。
-2. 玩家做出一个动作，你只细腻、生动、富有文学张力地描绘这一个动作带来的实时环境改变、声音、光影及NPC的实时反应。
-3. 严禁提供任何“下一步行动建议”、“选项123”或“温馨提示”。把想象力留给玩家，让他们完全自由地输入。
-4. 绝对、严禁替玩家做任何决定，也不要代替玩家说出他的台词。
+            content: `你是一个顶级的动态剧情推演器与高级剧本编织者。你将扮演冷酷、细腻且极具说书人质感的文字游戏环境渲染器。
+
+【行动守则 1——极致的上下文时空衔接】：
+- 你的叙事必须具备极高的流体连续性（像一镜到底的电影）。除非玩家的输入中【明确】出现了时间的跳跃、宏观时段的概括（如“接下来的几年里…”、“在这段隐居的日子里…”）、空间的剧烈转变、或开启了独立于当下的第三者独白/过场动画，否则你【绝对不允许】主动快进时间（严禁出现“几分钟后”、“经过一番折叠”等）、严禁擅自转场、严禁插入无关剧情。每一轮叙事必须死死咬住上一轮的末尾状态。
+
+【行动守则 2——半主动推动剧情（拒绝纯粹扩写）】：
+- 严禁死板地只对玩家的动作进行文字扩写。你必须根据玩家的当前行动，结合逻辑与世界观，【半主动地向前推进一步物理世界的连锁反应】。
+- 当玩家做出一个举动，你不仅要细腻渲染这个举动的结果，还要顺理成章地引出紧接着发生的合理后效、NPC的即时对策、环境的动态异变、或者是突如其来的小危机。以此半主动地为玩家拉开后续剧情的帷幕，让世界活过来。
+
+【行动守则 3——玩家把控最终主动权】：
+- 尽管你需要半主动抛出后续的连锁反应，但你【绝对严禁替玩家做决定】，更严禁替玩家说出台词或描述玩家的心理。
+- 绝对不要代替玩家宣布任何长线的判定，如“你成功逃离了这里”、“任务已经完成”或“你击败了敌人”。
+- 在渲染完当前动作的后效及你半主动引发的【新局面/新危机】后，立刻将烂摊子和选择权交还给玩家。严禁提供任何“提示”、“选项123”，让玩家完全自由地决定下一步该怎么见招拆招。
 
 【状态面板数据同步规则】：
 在每次回复的最末尾，你必须严格按照以下格式附带一行数据（不要更改标签名字），用于更新网页顶部的状态栏。请根据剧情合理扣除或增加属性：
@@ -141,7 +150,6 @@ async function getAIResponse(loadingId, blockId = null) {
         chatHistory.push({ role: "assistant", content: rawContent });
         refreshCollapsibleBlocks();
 
-        // 核心优化 1.2：只有当玩家手动存过档（或者是从已有槽位载入的），才进行自动追踪同步。新冒险绝不胡乱覆盖！
         if (currentSlot !== null) {
             localStorage.setItem(`ai_story_slot_${currentSlot}`, JSON.stringify(chatHistory));
         }
@@ -277,7 +285,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
     textOutput += `        📜 《AI 文字冒险：我的命运回忆录》 📜        \n`;
     textOutput += `==================================================\n`;
     textOutput += `导出时间：${new Date().toLocaleString()}\n`;
-    textOutput += `当前槽位：${currentSlot ? `进度【${currentSlot}】` : '暂未存档（新冒险）'}\n`; // 润色细节
+    textOutput += `当前槽位：${currentSlot ? `进度【${currentSlot}】` : '暂未存档（新冒险）'}\n`;
     textOutput += `--------------------------------------------------\n\n`;
 
     let turnNumber = 1;
@@ -337,22 +345,18 @@ document.getElementById('close-export-btn').addEventListener('click', () => {
     if (modal) modal.style.display = 'none';
 });
 
-// 绑定存档动作
 document.getElementById('save-btn-1').addEventListener('click', () => { manualSave(1); });
 document.getElementById('save-btn-2').addEventListener('click', () => { manualSave(2); });
 document.getElementById('save-btn-3').addEventListener('click', () => { manualSave(3); });
 
-// 核心优化 2：手动存储逻辑加入误触拦截
 function manualSave(slot) {
     const isConfirmed = confirm(`⚠️ 是否确定要将当前进度保存到【进度 ${slot}】吗？\n此操作将无情覆盖该槽位原有的全部老剧情！`);
-    if (!isConfirmed) return; // 玩家反悔，安全撤回
+    if (!isConfirmed) return; 
 
-    currentSlot = slot; // 正式绑定该槽位
+    currentSlot = slot; 
     localStorage.setItem(`ai_story_slot_${slot}`, JSON.stringify(chatHistory));
     alert(`💾 进度已强制同步并绑定到槽位【${slot}】。`);
 }
-
-// 核心优化 3：删除了 del-btn-all 的相关逻辑事件监听
 
 document.getElementById('back-menu-btn').addEventListener('click', () => {
     if(isTyping) return;
