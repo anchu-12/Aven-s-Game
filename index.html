@@ -11,8 +11,9 @@
         h2 { margin-top: 0; color: #fff; text-align: center; font-size: 26px; font-weight: 700; }
         .form-group { margin-bottom: 22px; }
         label { display: block; margin-bottom: 8px; color: var(--accent-color); font-weight: 600; font-size: 14px; }
-        input[type="text"], textarea { width: 100%; background: #20222b; border: 1px solid #2d313f; color: #fff; padding: 14px; border-radius: 8px; box-sizing: border-box; }
+        input[type="text"], textarea, select { width: 100%; background: #20222b; border: 1px solid #2d313f; color: #fff; padding: 14px; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
         textarea { height: 90px; resize: none; }
+        select { outline: none; cursor: pointer; }
         .start-btn { width: 100%; background: var(--accent-color); color: #000; border: none; padding: 16px; font-size: 16px; font-weight: 700; cursor: pointer; border-radius: 8px; margin-top: 15px; }
         #game-container { display: none; padding-top: 25px; position: relative; }
         
@@ -58,8 +59,18 @@
         <div class="form-group"><label>2. 快捷读档</label><div style="display: flex; gap: 8px; margin-top: 5px;"><button class="btn-sm" onclick="quickLoad(1)">进度 1</button><button class="btn-sm" onclick="quickLoad(2)">进度 2</button><button class="btn-sm" onclick="quickLoad(3)">进度 3</button></div></div>
         <hr style="border: 0; border-top: 1px solid #2d313f; margin: 25px 0;">
         <div class="form-group"><label>3. 设计世界观背景</label><textarea id="world-input"></textarea></div>
-        <div class="form-group"><label>4. 设定你的主角</label><textarea id="character-input"></textarea></div>
+        <div class="form-group"><label>4. 设定你的主角（若选第三人称小说视角，建议在此写明姓名）</label><textarea id="character-input"></textarea></div>
         <div class="form-group"><label>5. 设定主线大方向</label><textarea id="plot-input"></textarea></div>
+        
+        <!-- 新增修改：视角选择器 -->
+        <div class="form-group">
+            <label>6. 叙事视角风格</label>
+            <select id="perspective-input">
+                <option value="second" selected>👥 第二人称（代入感强，AI 称呼你为“你”）</option>
+                <option value="third">👁️ 第三人称（上帝视角，AI 像写网文小说一样称呼“他/她/主角名”）</option>
+            </select>
+        </div>
+
         <button class="start-btn" id="start-game-btn">生成世界，进入冒险</button>
     </div>
 
@@ -101,6 +112,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=12.5"></script>
+    <script src="script.js?v=13.0"></script>
 </body>
 </html>
