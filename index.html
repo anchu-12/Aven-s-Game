@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 文字冒险引擎 Ultra Pro</title>
+    <title>AI 文字冒险引擎 Ultra Pro (DeepSeek-V4-Pro 版)</title>
     <style>
         :root { --bg-color: #0d0e12; --panel-bg: #16171d; --accent-color: #00ffcc; --accent-glow: rgba(0, 255, 204, 0.3); --text-color: #e2e8f0; --text-muted: #64748b; --user-color: #ff007f; }
         body { background-color: var(--bg-color); color: var(--text-color); font-family: -apple-system, sans-serif; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 95vh; margin: 0; }
@@ -11,13 +11,13 @@
         h2 { margin-top: 0; color: #fff; text-align: center; font-size: 26px; font-weight: 700; }
         .form-group { margin-bottom: 22px; }
         label { display: block; margin-bottom: 8px; color: var(--accent-color); font-weight: 600; font-size: 14px; }
-        input[type="text"], textarea, select { width: 100%; background: #20222b; border: 1px solid #2d313f; color: #fff; padding: 14px; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        input[type="text"], textarea { width: 100%; background: #20222b; border: 1px solid #2d313f; color: #fff; padding: 14px; border-radius: 8px; box-sizing: border-box; }
         textarea { height: 90px; resize: none; }
-        select { outline: none; cursor: pointer; }
         .start-btn { width: 100%; background: var(--accent-color); color: #000; border: none; padding: 16px; font-size: 16px; font-weight: 700; cursor: pointer; border-radius: 8px; margin-top: 15px; }
         #game-container { display: none; padding-top: 25px; position: relative; }
         
-        .status-bar { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; background: #1f212a; padding: 12px 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #2d313f; font-size: 12px; align-items: center; gap: 8px; }
+        /* 状态栏：调整为5列自适应，容纳生命值与导出按钮 */
+        .status-bar { display: grid; grid-template-columns: 1fr 2fr 1fr 1fr 1fr; background: #1f212a; padding: 12px 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #2d313f; font-size: 12px; align-items: center; gap: 8px; }
         .status-item { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
         .status-label { color: var(--text-muted); font-size: 11px; font-weight: bold; }
         .status-value { color: #fff; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -33,49 +33,35 @@
         .control-bar { display: flex; justify-content: space-between; margin-bottom: 15px; }
         .btn-group { display: flex; gap: 8px; }
         .btn-sm { padding: 6px 14px; font-size: 12px; cursor: pointer; border: 1px solid #2d313f; background: #1f212a; color: var(--text-color); border-radius: 6px; }
-        
+        .btn-del { color: #ff4757; }
         #story-display { height: 420px; overflow-y: auto; background: #0f1015; border: 1px solid #1f212a; margin-bottom: 20px; padding: 20px; border-radius: 10px; font-size: 16px; line-height: 1.8; }
         #input-container { display: flex; background: #1f212a; border-radius: 8px; padding: 6px; border: 1px solid #2d313f; }
         #player-input { flex: 1; background: transparent; border: none; color: #fff; padding: 10px; font-size: 16px; outline: none; }
         #send-btn { background: var(--accent-color); color: #000; border: none; padding: 0 24px; font-weight: 700; cursor: pointer; border-radius: 6px; }
-        
         .story-block { margin-bottom: 15px; border-bottom: 1px solid #1a1c23; padding-bottom: 15px; }
         .user-action { color: var(--user-color); border-left: 3px solid var(--user-color); padding-left: 12px; font-weight: 600; margin-bottom: 8px; }
-        
         .collapsible .user-action { cursor: pointer; }
-        .collapsible .user-action::after { content: ' 📄 (已折叠·点击展开)'; font-size: 11px; color: var(--text-muted); }
+        .collapsible .user-action::after { content: ' 📄 (点击展开)'; font-size: 11px; color: var(--text-muted); }
         .ai-response { color: #edf2f7; white-space: pre-wrap; border-left: 3px solid var(--accent-color); padding-left: 12px; overflow: hidden; transition: all 0.3s; max-height: 2000px; opacity: 1; }
         .collapsible.collapsed .ai-response { max-height: 0; opacity: 0; padding: 0; margin: 0; border: none; }
         .system-msg { color: var(--text-muted); font-style: italic; font-size: 13px; text-align: center; margin: 15px 0; }
-
-        #export-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-        .modal-content-export { background: #16171d; width: 100%; max-width: 600px; border-radius: 12px; border: 1px solid #ffb300; padding: 20px; display: flex; flex-direction: column; gap: 15px; box-sizing: border-box; }
     </style>
 </head>
 <body>
     <div id="setup-container">
-        <h2>🛠️ 创造你的游戏 world Ultra Pro</h2>
+        <h2>🛠️ 创造你的游戏世界 Ultra Pro</h2>
         <div class="form-group"><label>1. 你的 DeepSeek API Key</label><input type="text" id="api-key-input" placeholder="sk-..."></div>
         <div class="form-group"><label>2. 快捷读档</label><div style="display: flex; gap: 8px; margin-top: 5px;"><button class="btn-sm" onclick="quickLoad(1)">进度 1</button><button class="btn-sm" onclick="quickLoad(2)">进度 2</button><button class="btn-sm" onclick="quickLoad(3)">进度 3</button></div></div>
         <hr style="border: 0; border-top: 1px solid #2d313f; margin: 25px 0;">
         <div class="form-group"><label>3. 设计世界观背景</label><textarea id="world-input"></textarea></div>
-        <div class="form-group"><label>4. 设定你的主角（若选第三人称小说视角，建议在此写明姓名）</label><textarea id="character-input"></textarea></div>
+        <div class="form-group"><label>4. 设定你的主角</label><textarea id="character-input"></textarea></div>
         <div class="form-group"><label>5. 设定主线大方向</label><textarea id="plot-input"></textarea></div>
-        
-        <!-- 新增修改：视角选择器 -->
-        <div class="form-group">
-            <label>6. 叙事视角风格</label>
-            <select id="perspective-input">
-                <option value="second" selected>👥 第二人称（代入感强，AI 称呼你为“你”）</option>
-                <option value="third">👁️ 第三人称（上帝视角，AI 像写网文小说一样称呼“他/她/主角名”）</option>
-            </select>
-        </div>
-
         <button class="start-btn" id="start-game-btn">生成世界，进入冒险</button>
     </div>
 
     <div id="game-container">
         <div class="status-bar">
+            <div class="status-item"><span class="status-label">❤️ 生命值</span><span class="status-value" id="status-hp">等待生成...</span></div>
             <div class="status-item"><span class="status-label">📍 当前位置</span><span class="status-value" id="status-loc">等待生成...</span></div>
             <button class="icon-btn" id="modal-inv-btn" onclick="toggleModal('modal-inv', true)">🎒 装备</button>
             <button class="icon-btn" id="modal-rel-btn" onclick="toggleModal('modal-rel', true)">👥 关系</button>
@@ -92,26 +78,19 @@
             <div class="modal-body" id="status-rel-box">还未遇到重要角色...</div>
         </div>
 
+        <div class="info-modal" id="export-modal" style="display: none; flex-direction: column;">
+            <div class="modal-header"><span class="modal-title">📜 我的冒险回忆录</span><span class="modal-close" id="close-export-btn">✕</span></div>
+            <textarea id="export-textarea" style="height: 220px; margin-bottom: 15px; font-size: 13px; line-height: 1.5; background: #0f1015;" readonly></textarea>
+            <button class="start-btn" id="copy-text-btn" style="margin-top: 0; padding: 12px; font-size: 14px;">✨ 复制到手机剪贴板</button>
+        </div>
+
         <div class="control-bar">
             <div class="btn-group"><button class="btn-sm" id="save-btn-1">保存至 1</button><button class="btn-sm" id="save-btn-2">保存至 2</button><button class="btn-sm" id="save-btn-3">保存至 3</button></div>
-            <div class="btn-group"><button class="btn-sm" id="back-menu-btn">返回主菜单</button></div>
+            <div class="btn-group"><button class="btn-sm btn-del" id="del-btn-all">清空此档</button><button class="btn-sm" id="back-menu-btn">返回主菜单</button></div>
         </div>
         <div id="story-display"></div>
         <div id="input-container"><input type="text" id="player-input" placeholder="输入你的下一步行动..." autofocus><button id="send-btn">发送</button></div>
     </div>
-
-    <div id="export-modal">
-        <div class="modal-content-export">
-            <h3 style="margin: 0; color: #ffb300; text-align: center;">📜 我的纯净剧情文本</h3>
-            <p style="margin: 0; color: #64748b; font-size: 12px; text-align: center;">已成功注入 UTF-8 编码。长按框内文本全选复制，可安全存入便签。</p>
-            <textarea id="export-textarea" readonly style="width: 100%; height: 280px; background: #0f1015; border: 1px solid #2d313f; color: #edf2f7; padding: 12px; border-radius: 6px; font-size: 14px; resize: none; outline: none; box-sizing: border-box;"></textarea>
-            <div style="display: flex; gap: 10px;">
-                <button class="btn-sm" id="copy-text-btn" style="flex: 1; background: #ffb300; color: #000; font-weight: bold; padding: 10px;">一键全选文本</button>
-                <button class="btn-sm" id="close-export-btn" style="padding: 10px;">关闭窗口</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="script.js?v=13.0"></script>
+    <script src="script.js?v=4.0"></script>
 </body>
 </html>

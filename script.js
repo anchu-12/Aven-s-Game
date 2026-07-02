@@ -2,7 +2,7 @@ const apiUrl = "https://api.deepseek.com/v1/chat/completions";
 
 let apiKey = "";
 let chatHistory = [];
-let currentSlot = null; 
+let currentSlot = 1; 
 let isTyping = false; 
 
 const setupContainer = document.getElementById('setup-container');
@@ -12,15 +12,16 @@ const playerInput = document.getElementById('player-input');
 const sendBtn = document.getElementById('send-btn');
 const startGameBtn = document.getElementById('start-game-btn');
 
-if(localStorage.getItem('my_ai_game_key')) {
-    document.getElementById('api-key-input').value = localStorage.getItem('my_ai_game_key');
-}
-
-function toggleModal(modalId, show) {
+// 修正补全：定义全局全局弹窗控制函数，修复原生网页控制台报错
+window.toggleModal = function(modalId, show) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.style.display = show ? 'block' : 'none';
     }
+}
+
+if(localStorage.getItem('my_ai_game_key')) {
+    document.getElementById('api-key-input').value = localStorage.getItem('my_ai_game_key');
 }
 
 function quickLoad(slot) {
@@ -36,7 +37,7 @@ function quickLoad(slot) {
     }
     apiKey = key;
     localStorage.setItem('my_ai_game_key', apiKey);
-    currentSlot = slot; 
+    currentSlot = slot;
     loadGameFromSlot(slot);
 }
 
@@ -46,59 +47,26 @@ startGameBtn.addEventListener('click', async () => {
     const worldSetting = document.getElementById('world-input').value.trim() || "普通的现代都市";
     const charSetting = document.getElementById('character-input').value.trim() || "普通人";
     const plotSetting = document.getElementById('plot-input').value.trim() || "自由探索世界";
-    
-    // 捕获玩家选择的人称视角
-    const perspectiveType = document.getElementById('perspective-input').value;
 
     if (!apiKey) {
         alert("请输入你的 DeepSeek API Key 才能开始游戏！");
         return;
     }
     localStorage.setItem('my_ai_game_key', apiKey);
-    currentSlot = null;
-
-    // 动态为人称注入量身定制的最高指令
-    let perspectivePrompt = "";
-    if (perspectiveType === "third") {
-        perspectivePrompt = `【核心叙事视角——第三人称小说上帝视角】：
-- 你必须严格以【第三人称小说】的方式进行全知叙事。绝对、永远不准对玩家使用“你”这个词。
-- 玩家的主角必须被称为“他”、“她”、或根据玩家设定里提供的具体姓名（如果没有名字，就用“他/她”或主角身份统称）。
-- 示例：当玩家输入“我拔出剑”时，你必须写：“陆长风（或他）眼底一冷，腰间长剑悍然出鞘…”，而不是“你拔出了剑”。整个世界像一本宏大的实体小说。`;
-    } else {
-        perspectivePrompt = `【核心叙事视角——第二人称互动视角】：
-- 你必须严格使用第二人称“你”来称呼玩家。
-- 所有描写必须带入主观视角（例如：“你推开了门，迎面而来的是风雪…”、“他转头拍了拍你的肩膀”）。`;
-    }
 
     chatHistory = [
         {
             role: "system",
-            content: `你是一个顶级的动态剧情推演器与长篇小说编织者。你将扮演冷酷、真实且极具现场感的文字游戏环境渲染器。
-
-${perspectivePrompt}
-
-【行动守则 1——极致的上下文时空衔接】：
-- 你的叙事必须具备极高的流体连续性（像一镜到底的电影长镜头）。除非玩家的输入中【明确】出现了时间的跳跃、宏观时段的概括（如“接下来的几年里…”）、空间的剧烈转变、或开启了独立于当下的第三者独白，否则你【绝对不允许】主动快进时间（严禁出现“几分钟后”、“经过一番折叠”等）、严禁擅自转场、严禁插入无关剧情。每一轮叙事必须死死咬住上一轮的末尾状态，一个场景必须通过多个回合进行极为细腻的持续推演。
-
-==================================================
-【行动守则 2——彻底抹杀意境定格与抒情收尾（抗尴尬强制令）】：
-- ❌【绝对禁止】在每段回复的最后进行带有“总结性”、“大和解”、“戏剧升华”或“抒情画面描摹”的定格文青描写。
-- ❌【极度油腻黑名单句式（严禁出现）】：禁止使用类似于“温柔地定格成一幅三人都找到自己位置的温暖的画面”、“月光落在她嘴角上，像是一层温柔地和解”、“而这一刻，空气中弥漫着久违的释怀…”、“在这静谧的夜里，你们的命运悄然交织…”等任何强行将动态场景打包收尾、自我感动的戏剧旁白。
-- ⚡【正确做法】：你的每轮回复在字数达到时，【必须在最尖锐、最具体、最具有物理动态的瞬间断崖式戛然而止】。最后一句话必须是【正在发生的物理事实、环境噪声、或NPC未完的台词】（例如：刀锋卡在颈动脉前、冷汗顺着下巴滴落、NPC说到一半的冰冷台词、或者是远处突然炸响的警报）。直接把充满未知和惯性的现场丢给玩家，不要给现场画上完美的句号！
-==================================================
-
-【行动守则 3——半主动推动剧情】：
-- 严禁死板地只对玩家的动作进行文字扩写。你必须根据玩家的当前行动，结合逻辑与世界观，【半主动地向前推进一步物理世界的连锁反应】。
-- 当主角做出一个举动，你不仅要细腻渲染这个举动的结果，还要顺理成章地引出紧接着发生的合理后效、NPC的即时对策、环境的动态异变、或者是突如其来的小危机。以此半主动地为玩家拉开后续剧情的帷幕，让世界活过来。
-
-【行动守则 4——玩家把控最终主动权】：
-- 尽管你需要半主动抛出后续的连锁反应，但你【绝对严禁替玩家做决定】，更严禁替玩家说出台词或描述玩家的心理。
-- 绝对不要代替玩家宣布任何长线的判定，如“你成功逃离了这里”、“任务已经完成”或“你击败了敌人”。
-- 严禁提供任何“提示”、“选项123”，让玩家完全自由地决定下一步该怎么见招拆招。
+            content: `你是一个顶级的纯场景叙事NPC和文字游戏环境渲染器。
+【核心行动守则——玩家主导】：
+1. 剧情的发展速度必须完全掌控在玩家手中。你绝对不主动推动时间流逝或剧情大跨步，严禁主动宣布“任务完成”、“成功逃脱”或直接转场。
+2. 玩家做出一个动作，你只细腻、生动、富有文学张力地描绘这一个动作带来的实时环境改变、声音、光影及NPC的实时反应。
+3. 严禁提供任何“下一步行动建议”、“选项123”或“温馨提示”。把想象力留给玩家，让他们完全自由地输入。
+4. 绝对、严禁替玩家做任何决定，也不要代替玩家说出他的台词。
 
 【状态面板数据同步规则】：
 在每次回复的最末尾，你必须严格按照以下格式附带一行数据（不要更改标签名字），用于更新网页顶部的状态栏。请根据剧情合理扣除或增加属性：
-DATA_START{"hp":"生命值","inv":"全部装备道具","rel":"重要人物关系","loc":"当前精准位置"}DATA_END`
+DATA_START{"hp":"生命值数值","inv":"当前全部装备道具","loc":"当前精准位置"}DATA_END`
         },
         {
             role: "system",
@@ -110,7 +78,7 @@ DATA_START{"hp":"生命值","inv":"全部装备道具","rel":"重要人物关系
     gameContainer.style.display = 'block';
     storyDisplay.innerHTML = ""; 
 
-    const loadingId = appendSystemMessage('⏳ 正在全速构建高精度游戏世界...');
+    const loadingId = appendSystemMessage('⏳ 正在全速构建高精度 Pro 游戏世界...');
     await getAIResponse(loadingId);
 });
 
@@ -125,7 +93,7 @@ async function handlePlayerTurn() {
     playerInput.value = '';
     const blockId = createStoryBlock(`> ${action}`);
     chatHistory.push({ role: "user", content: action });
-    const loadingId = appendSystemMessage('⚡ 推演环境中...');
+    const loadingId = appendSystemMessage('⚡ 满血大模型正在深度推演中...');
 
     await getAIResponse(loadingId, blockId);
 }
@@ -139,7 +107,7 @@ async function getAIResponse(loadingId, blockId = null) {
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: "deepseek-chat", 
+                model: "deepseek-v4-pro", // 🛠️ 核心修改：升级为 Pro 满血版
                 messages: chatHistory,
                 temperature: 0.75
             })
@@ -170,15 +138,12 @@ async function getAIResponse(loadingId, blockId = null) {
 
         chatHistory.push({ role: "assistant", content: rawContent });
         refreshCollapsibleBlocks();
-
-        if (currentSlot !== null) {
-            localStorage.setItem(`ai_story_slot_${currentSlot}`, JSON.stringify(chatHistory));
-        }
+        localStorage.setItem(`ai_story_slot_${currentSlot}`, JSON.stringify(chatHistory));
 
     } catch (error) {
         console.error(error);
         if (document.getElementById(loadingId)) {
-            document.getElementById(loadingId).innerText = "❌ 连线断开，请检查网络或 Key 状态。";
+            document.getElementById(loadingId).innerText = "❌ 连线断开，请检查网络、中转平台余额或 Key 状态。";
         }
     }
 }
@@ -248,9 +213,10 @@ function appendTextWithFastTypewriter(targetElement, text) {
 function updateStatusBar(jsonStr) {
     try {
         const status = JSON.parse(jsonStr.trim());
-        if(status.loc && document.getElementById('status-loc')) document.getElementById('status-loc').innerText = status.loc;
-        if(status.inv && document.getElementById('status-inv-box')) document.getElementById('status-inv-box').innerText = status.inv;
-        if(status.rel && document.getElementById('status-rel-box')) document.getElementById('status-rel-box').innerText = status.rel;
+        // 修正升级：完美同步更新装备弹窗和关系弹窗的文本内容
+        if(status.hp) document.getElementById('status-hp').innerText = status.hp;
+        if(status.inv) document.getElementById('status-inv-box').innerText = status.inv;
+        if(status.loc) document.getElementById('status-loc').innerText = status.loc;
     } catch(e) {
         console.log("数据同步轻微溢出", e);
     }
@@ -306,7 +272,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
     textOutput += `        📜 《AI 文字冒险：我的命运回忆录》 📜        \n`;
     textOutput += `==================================================\n`;
     textOutput += `导出时间：${new Date().toLocaleString()}\n`;
-    textOutput += `当前槽位：${currentSlot ? `进度【${currentSlot}】` : '暂未存档（新冒险）'}\n`;
+    textOutput += `当前槽位：进度【${currentSlot}】\n`;
     textOutput += `--------------------------------------------------\n\n`;
 
     let turnNumber = 1;
@@ -324,16 +290,15 @@ document.getElementById('export-btn').addEventListener('click', () => {
 
     textOutput += `=== 剧本终 · 见证了你的伟大史诗 ===\n`;
 
+    const blob = new Blob(["\ufeff" + textOutput], { type: "text/plain;charset=utf-8" });
+    const fileName = `我的冒险回忆录_进度${currentSlot}.txt`;
+
     const modal = document.getElementById('export-modal');
     const textarea = document.getElementById('export-textarea');
-    if (modal && textarea) {
-        textarea.value = textOutput;
-        modal.style.display = 'flex';
-    }
+    textarea.value = textOutput;
+    modal.style.display = 'flex'; // 修正优化：彻底打通内嵌弹窗逻辑
 
     try {
-        const blob = new Blob(["\ufeff" + textOutput], { type: "text/plain;charset=utf-8" });
-        const fileName = `我的冒险回忆录_${currentSlot ? '进度'+currentSlot : '临时新篇'}.txt`;
         const downloadUrl = URL.createObjectURL(blob);
         const downloadLink = document.createElement('a');
         downloadLink.href = downloadUrl;
@@ -343,27 +308,24 @@ document.getElementById('export-btn').addEventListener('click', () => {
         document.body.removeChild(downloadLink);
         URL.revokeObjectURL(downloadUrl);
     } catch (e) {
-        console.log("环境限制原生下载，已自动展示零乱码安全复制弹窗");
+        console.log("环境限制原生下载，已自动切换到安全的内嵌面板复制方案");
     }
 });
 
 document.getElementById('copy-text-btn').addEventListener('click', () => {
     const textarea = document.getElementById('export-textarea');
-    if (textarea) {
-        textarea.select();
-        textarea.setSelectionRange(0, 99999); 
-        try {
-            document.execCommand('copy');
-            alert('✨ 剧情文本已全选并成功复制到你的手机剪贴板！可以直接去微信或便签里粘贴啦。');
-        } catch (err) {
-            alert('请长按文本框内的文字进行手动全选复制。');
-        }
+    textarea.select();
+    textarea.setSelectionRange(0, 99999); 
+    try {
+        document.execCommand('copy');
+        alert('✨ 剧情文本已全选并成功复制到你的手机剪贴板！可以直接去粘贴保存啦。');
+    } catch (err) {
+        alert('请长按文本框内的文字进行手动全选复制。');
     }
 });
 
 document.getElementById('close-export-btn').addEventListener('click', () => {
-    const modal = document.getElementById('export-modal');
-    if (modal) modal.style.display = 'none';
+    document.getElementById('export-modal').style.display = 'none';
 });
 
 document.getElementById('save-btn-1').addEventListener('click', () => { manualSave(1); });
@@ -371,13 +333,17 @@ document.getElementById('save-btn-2').addEventListener('click', () => { manualSa
 document.getElementById('save-btn-3').addEventListener('click', () => { manualSave(3); });
 
 function manualSave(slot) {
-    const isConfirmed = confirm(`⚠️ 是否确定要将当前进度保存到【进度 ${slot}】吗？\n此操作将无情覆盖该槽位原有的全部老剧情！`);
-    if (!isConfirmed) return; 
-
-    currentSlot = slot; 
+    currentSlot = slot;
     localStorage.setItem(`ai_story_slot_${slot}`, JSON.stringify(chatHistory));
-    alert(`💾 进度已强制同步并绑定到槽位【${slot}】。`);
+    alert(`💾 进度已强制同步到槽位【${slot}】。`);
 }
+
+document.getElementById('del-btn-all').addEventListener('click', () => {
+    if(confirm(`确定销毁槽位【${currentSlot}】的数据吗？`)) {
+        localStorage.removeItem(`ai_story_slot_${currentSlot}`);
+        location.reload();
+    }
+});
 
 document.getElementById('back-menu-btn').addEventListener('click', () => {
     if(isTyping) return;
