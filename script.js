@@ -12,7 +12,6 @@ const playerInput = document.getElementById('player-input');
 const sendBtn = document.getElementById('send-btn');
 const startGameBtn = document.getElementById('start-game-btn');
 
-// 修正补全：定义全局全局弹窗控制函数，修复原生网页控制台报错
 window.toggleModal = function(modalId, show) {
     const modal = document.getElementById(modalId);
     if (modal) {
@@ -47,6 +46,8 @@ startGameBtn.addEventListener('click', async () => {
     const worldSetting = document.getElementById('world-input').value.trim() || "普通的现代都市";
     const charSetting = document.getElementById('character-input').value.trim() || "普通人";
     const plotSetting = document.getElementById('plot-input').value.trim() || "自由探索世界";
+    // 核心改动加回：抓取用户选择的叙事人称规则
+    const povSetting = document.getElementById('pov-select').value;
 
     if (!apiKey) {
         alert("请输入你的 DeepSeek API Key 才能开始游戏！");
@@ -63,6 +64,9 @@ startGameBtn.addEventListener('click', async () => {
 2. 玩家做出一个动作，你只细腻、生动、富有文学张力地描绘这一个动作带来的实时环境改变、声音、光影及NPC的实时反应。
 3. 严禁提供任何“下一步行动建议”、“选项123”或“温馨提示”。把想象力留给玩家，让他们完全自由地输入。
 4. 绝对、严禁替玩家做任何决定，也不要代替玩家说出他的台词。
+
+【人称视角约束守则】：
+你必须完全遵循【${povSetting}】。请在后续所有的场景推演、环境渲染、环境变化描述中强制执行这个代词标准，绝对不允许中途切换或者混淆人称！
 
 【状态面板数据同步规则】：
 在每次回复的最末尾，你必须严格按照以下格式附带一行数据（不要更改标签名字），用于更新网页顶部的状态栏。请根据剧情合理扣除或增加属性：
@@ -107,7 +111,7 @@ async function getAIResponse(loadingId, blockId = null) {
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: "deepseek-v4-pro", // 🛠️ 核心修改：升级为 Pro 满血版
+                model: "deepseek-v4-pro", 
                 messages: chatHistory,
                 temperature: 0.75
             })
@@ -213,7 +217,6 @@ function appendTextWithFastTypewriter(targetElement, text) {
 function updateStatusBar(jsonStr) {
     try {
         const status = JSON.parse(jsonStr.trim());
-        // 修正升级：完美同步更新装备弹窗和关系弹窗的文本内容
         if(status.hp) document.getElementById('status-hp').innerText = status.hp;
         if(status.inv) document.getElementById('status-inv-box').innerText = status.inv;
         if(status.loc) document.getElementById('status-loc').innerText = status.loc;
@@ -296,7 +299,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
     const modal = document.getElementById('export-modal');
     const textarea = document.getElementById('export-textarea');
     textarea.value = textOutput;
-    modal.style.display = 'flex'; // 修正优化：彻底打通内嵌弹窗逻辑
+    modal.style.display = 'flex'; 
 
     try {
         const downloadUrl = URL.createObjectURL(blob);
@@ -328,22 +331,21 @@ document.getElementById('close-export-btn').addEventListener('click', () => {
     document.getElementById('export-modal').style.display = 'none';
 });
 
+// 注册存档按钮监听
 document.getElementById('save-btn-1').addEventListener('click', () => { manualSave(1); });
 document.getElementById('save-btn-2').addEventListener('click', () => { manualSave(2); });
 document.getElementById('save-btn-3').addEventListener('click', () => { manualSave(3); });
 
+// 核心改动：加回弹窗防误触的拦截机制
 function manualSave(slot) {
+    const isConfirm = confirm(`⚠️ 覆盖确认：\n你确定要将当前最新的游戏进度，覆盖并保存到【进度 ${slot}】吗？这将会抹除该槽位先前的历史旧数据！`);
+    if (!isConfirm) {
+        return; // 用户点击取消，直接安全退出，不作处理
+    }
     currentSlot = slot;
     localStorage.setItem(`ai_story_slot_${slot}`, JSON.stringify(chatHistory));
-    alert(`💾 进度已强制同步到槽位【${slot}】。`);
+    alert(`💾 进度已成功强制同步到槽位【${slot}】。`);
 }
-
-document.getElementById('del-btn-all').addEventListener('click', () => {
-    if(confirm(`确定销毁槽位【${currentSlot}】的数据吗？`)) {
-        localStorage.removeItem(`ai_story_slot_${currentSlot}`);
-        location.reload();
-    }
-});
 
 document.getElementById('back-menu-btn').addEventListener('click', () => {
     if(isTyping) return;
