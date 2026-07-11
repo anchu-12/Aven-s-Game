@@ -2,7 +2,8 @@ const apiUrl = "https://api.deepseek.com/v1/chat/completions";
 
 let apiKey = "";
 let chatHistory = [];
-let currentSlot = 1; 
+// 🛠️ 核心修复：初始指针设为 null，新游戏在未手动保存前是“临时体验状态”，绝对不偷偷写入任何存档！
+let currentSlot = null; 
 let isTyping = false; 
 
 const setupContainer = document.getElementById('setup-container');
@@ -36,7 +37,7 @@ function quickLoad(slot) {
     }
     apiKey = key;
     localStorage.setItem('my_ai_game_key', apiKey);
-    currentSlot = slot;
+    currentSlot = slot; // 读档会正常锁定槽位
     loadGameFromSlot(slot);
 }
 
@@ -46,7 +47,6 @@ startGameBtn.addEventListener('click', async () => {
     const worldSetting = document.getElementById('world-input').value.trim() || "普通的现代都市";
     const charSetting = document.getElementById('character-input').value.trim() || "普通人";
     const plotSetting = document.getElementById('plot-input').value.trim() || "自由探索世界";
-    // 核心改动加回：抓取用户选择的叙事人称规则
     const povSetting = document.getElementById('pov-select').value;
 
     if (!apiKey) {
@@ -54,6 +54,9 @@ startGameBtn.addEventListener('click', async () => {
         return;
     }
     localStorage.setItem('my_ai_game_key', apiKey);
+
+    // 🛠️ 确保每次点新建游戏，都重置为临时的空槽位，不覆盖旧进度
+    currentSlot = null; 
 
     chatHistory = [
         {
@@ -142,7 +145,11 @@ async function getAIResponse(loadingId, blockId = null) {
 
         chatHistory.push({ role: "assistant", content: rawContent });
         refreshCollapsibleBlocks();
-        localStorage.setItem(`ai_story_slot_${currentSlot}`, JSON.stringify(chatHistory));
+
+        // 🛠️ 核心修改：只有在玩家手动存档绑定了槽位，或者读取了存盘时，才会自动触发覆写。否则为临时游玩状态，绝不占用前三个档！
+        if (currentSlot !== null) {
+            localStorage.setItem(`ai_story_slot_${currentSlot}`, JSON.stringify(chatHistory));
+        }
 
     } catch (error) {
         console.error(error);
@@ -275,14 +282,15 @@ document.getElementById('export-btn').addEventListener('click', () => {
     textOutput += `        📜 《AI 文字冒险：我的命运回忆录》 📜        \n`;
     textOutput += `==================================================\n`;
     textOutput += `导出时间：${new Date().toLocaleString()}\n`;
-    textOutput += `当前槽位：进度【${currentSlot}】\n`;
+    // 🛠️ 导出文本细节同步：如果还没存档，则提示当前为临时状态
+    textOutput += `当前槽位：${currentSlot ? `进度【${currentSlot}】` : '临时新游戏（尚未手动存档）'}\n`;
     textOutput += `--------------------------------------------------\n\n`;
 
     let turnNumber = 1;
     chatHistory.forEach(msg => {
         if (msg.role === 'system') return;
         if (msg.role === 'user') {
-            textOutput += `【第 ${turnNumber} 步 · 我的抉择】>\n${msg.content}\n\n`;
+            textOutput += `【第 ${turnNumber} 步 · 我的抉肤】>\n${msg.content}\n\n`;
             turnNumber++;
         } else if (msg.role === 'assistant') {
             let cleanNarrative = msg.content.replace(/DATA_START([\s\S]*?)DATA_END/, '').trim();
@@ -294,7 +302,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
     textOutput += `=== 剧本终 · 见证了你的伟大史诗 ===\n`;
 
     const blob = new Blob(["\ufeff" + textOutput], { type: "text/plain;charset=utf-8" });
-    const fileName = `我的冒险回忆录_进度${currentSlot}.txt`;
+    const fileName = `我的冒险回忆录_${currentSlot ? `进度${currentSlot}` : '临时未存档'}.txt`;
 
     const modal = document.getElementById('export-modal');
     const textarea = document.getElementById('export-textarea');
@@ -331,20 +339,19 @@ document.getElementById('close-export-btn').addEventListener('click', () => {
     document.getElementById('export-modal').style.display = 'none';
 });
 
-// 注册存档按钮监听
 document.getElementById('save-btn-1').addEventListener('click', () => { manualSave(1); });
 document.getElementById('save-btn-2').addEventListener('click', () => { manualSave(2); });
 document.getElementById('save-btn-3').addEventListener('click', () => { manualSave(3); });
 
-// 核心改动：加回弹窗防误触的拦截机制
 function manualSave(slot) {
     const isConfirm = confirm(`⚠️ 覆盖确认：\n你确定要将当前最新的游戏进度，覆盖并保存到【进度 ${slot}】吗？这将会抹除该槽位先前的历史旧数据！`);
     if (!isConfirm) {
-        return; // 用户点击取消，直接安全退出，不作处理
+        return; 
     }
+    // 🛠️ 手动保存的一瞬间，正式解封锁定状态，并将当前指针与之绑定！
     currentSlot = slot;
     localStorage.setItem(`ai_story_slot_${slot}`, JSON.stringify(chatHistory));
-    alert(`💾 进度已成功强制同步到槽位【${slot}】。`);
+    alert(`💾 进度已成功同步并锁定到槽位【${slot}】。此后在此局内的动作将自动增量存盘。`);
 }
 
 document.getElementById('back-menu-btn').addEventListener('click', () => {
