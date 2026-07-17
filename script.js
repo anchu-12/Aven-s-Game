@@ -2,9 +2,10 @@ const apiUrl = "https://api.deepseek.com/v1/chat/completions";
 
 let apiKey = "";
 let chatHistory = [];
-// 🛠️ 核心修复：初始指针设为 null，新游戏在未手动保存前是“临时体验状态”，绝对不偷偷写入任何存档！
 let currentSlot = null; 
 let isTyping = false; 
+// 🛠️ 局内全局模型变量
+let currentModel = "deepseek-v4-pro"; 
 
 const setupContainer = document.getElementById('setup-container');
 const gameContainer = document.getElementById('game-container');
@@ -12,6 +13,7 @@ const storyDisplay = document.getElementById('story-display');
 const playerInput = document.getElementById('player-input');
 const sendBtn = document.getElementById('send-btn');
 const startGameBtn = document.getElementById('start-game-btn');
+const gameModelSelect = document.getElementById('game-model-select');
 
 window.toggleModal = function(modalId, show) {
     const modal = document.getElementById(modalId);
@@ -37,9 +39,21 @@ function quickLoad(slot) {
     }
     apiKey = key;
     localStorage.setItem('my_ai_game_key', apiKey);
-    currentSlot = slot; // 读档会正常锁定槽位
+    currentSlot = slot; 
     loadGameFromSlot(slot);
 }
+
+// 🛠️ 监听游戏内部的 AI 实时热切换
+gameModelSelect.addEventListener('change', (e) => {
+    currentModel = e.target.value;
+    const modelLabel = currentModel === "deepseek-v4-pro" ? "DeepSeek Pro" : "DeepSeek Flash";
+    appendSystemMessage(`🤖 逻辑引擎已实时热切至：【${modelLabel}】。接下来的故事推演将以此核心计算！`);
+    
+    // 如果已经在非临时存档中，直接同步覆写状态
+    if (currentSlot !== null) {
+        saveDataToLocalStorage(currentSlot);
+    }
+});
 
 startGameBtn.addEventListener('click', async () => {
     if(isTyping) return;
@@ -48,6 +62,10 @@ startGameBtn.addEventListener('click', async () => {
     const charSetting = document.getElementById('character-input').value.trim() || "普通人";
     const plotSetting = document.getElementById('plot-input').value.trim() || "自由探索世界";
     const povSetting = document.getElementById('pov-select').value;
+    
+    // 🛠️ 获取首页选取的 AI 模型并同步至游戏内部的选择菜单
+    currentModel = document.getElementById('model-select').value;
+    gameModelSelect.value = currentModel;
 
     if (!apiKey) {
         alert("请输入你的 DeepSeek API Key 才能开始游戏！");
@@ -55,7 +73,6 @@ startGameBtn.addEventListener('click', async () => {
     }
     localStorage.setItem('my_ai_game_key', apiKey);
 
-    // 🛠️ 确保每次点新建游戏，都重置为临时的空槽位，不覆盖旧进度
     currentSlot = null; 
 
     chatHistory = [
@@ -85,7 +102,8 @@ DATA_START{"hp":"生命值数值","inv":"当前全部装备道具","loc":"当前
     gameContainer.style.display = 'block';
     storyDisplay.innerHTML = ""; 
 
-    const loadingId = appendSystemMessage('⏳ 正在全速构建高精度 Pro 游戏世界...');
+    const modelLabel = currentModel === "deepseek-v4-pro" ? "Pro" : "Flash";
+    const loadingId = appendSystemMessage(`⏳ 正在通过 [DeepSeek-${modelLabel}] 全速构建高精度游戏世界...`);
     await getAIResponse(loadingId);
 });
 
@@ -100,7 +118,10 @@ async function handlePlayerTurn() {
     playerInput.value = '';
     const blockId = createStoryBlock(`> ${action}`);
     chatHistory.push({ role: "user", content: action });
-    const loadingId = appendSystemMessage('⚡ 满血大模型正在深度推演中...');
+    
+    // 🛠️ 根据当前的动态模型展示推演提示
+    const modelLabel = currentModel === "deepseek-v4-pro" ? "Pro" : "Flash";
+    const loadingId = appendSystemMessage(`⚡ [DeepSeek-${modelLabel}] 正在深度推演世界走向...`);
 
     await getAIResponse(loadingId, blockId);
 }
@@ -114,7 +135,7 @@ async function getAIResponse(loadingId, blockId = null) {
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: "deepseek-v4-pro", 
+                model: currentModel, // 🛠️ 传参动态读取当前的所选模型
                 messages: chatHistory,
                 temperature: 0.75
             })
@@ -146,9 +167,9 @@ async function getAIResponse(loadingId, blockId = null) {
         chatHistory.push({ role: "assistant", content: rawContent });
         refreshCollapsibleBlocks();
 
-        // 🛠️ 核心修改：只有在玩家手动存档绑定了槽位，或者读取了存盘时，才会自动触发覆写。否则为临时游玩状态，绝不占用前三个档！
+        // 如果已经绑定了槽位，触发安全的自动增量覆写
         if (currentSlot !== null) {
-            localStorage.setItem(`ai_story_slot_${currentSlot}`, JSON.stringify(chatHistory));
+            saveDataToLocalStorage(currentSlot);
         }
 
     } catch (error) {
@@ -243,11 +264,33 @@ function appendSystemMessage(text) {
     return id;
 }
 
+// 🛠️ 提取并封装存档数据格式，使其能够打包绑定当前所选 AI 模型
+function saveDataToLocalStorage(slot) {
+    const pack = {
+        model: currentModel,
+        history: chatHistory
+    };
+    localStorage.setItem(`ai_story_slot_${slot}`, JSON.stringify(pack));
+}
+
 function loadGameFromSlot(slot) {
     const saved = localStorage.getItem(`ai_story_slot_${slot}`);
     if (!saved) return;
     
-    chatHistory = JSON.parse(saved);
+    const parsed = JSON.parse(saved);
+    
+    // 🛠️ 兼容性升级：如果读取的是没有包含模型字段的原始旧版本存档，自动补充默认 Pro 模型
+    if (parsed.history && parsed.model) {
+        chatHistory = parsed.history;
+        currentModel = parsed.model;
+    } else {
+        chatHistory = Array.isArray(parsed) ? parsed : [];
+        currentModel = "deepseek-v4-pro";
+    }
+    
+    // 同步把局内界面的下拉选项设为存档保存时的模型状态
+    gameModelSelect.value = currentModel;
+    
     setupContainer.style.display = 'none';
     gameContainer.style.display = 'block';
     storyDisplay.innerHTML = ""; 
@@ -270,7 +313,8 @@ function loadGameFromSlot(slot) {
     });
     
     refreshCollapsibleBlocks();
-    appendSystemMessage(`💾 成功跃迁回时空节点【${slot}】。`);
+    const modelLabel = currentModel === "deepseek-v4-pro" ? "Pro" : "Flash";
+    appendSystemMessage(`💾 成功跃迁回时空节点【${slot}】。已自动接轨模型：[${modelLabel}]。`);
 }
 
 document.getElementById('export-btn').addEventListener('click', () => {
@@ -282,15 +326,15 @@ document.getElementById('export-btn').addEventListener('click', () => {
     textOutput += `        📜 《AI 文字冒险：我的命运回忆录》 📜        \n`;
     textOutput += `==================================================\n`;
     textOutput += `导出时间：${new Date().toLocaleString()}\n`;
-    // 🛠️ 导出文本细节同步：如果还没存档，则提示当前为临时状态
     textOutput += `当前槽位：${currentSlot ? `进度【${currentSlot}】` : '临时新游戏（尚未手动存档）'}\n`;
+    textOutput += `采用引擎：${currentModel === 'deepseek-v4-pro' ? 'DeepSeek Pro 深度推理版' : 'DeepSeek Flash 极速响应版'}\n`;
     textOutput += `--------------------------------------------------\n\n`;
 
     let turnNumber = 1;
     chatHistory.forEach(msg => {
         if (msg.role === 'system') return;
         if (msg.role === 'user') {
-            textOutput += `【第 ${turnNumber} 步 · 我的抉肤】>\n${msg.content}\n\n`;
+            textOutput += `【第 ${turnNumber} 步 · 我的抉择】>\n${msg.content}\n\n`;
             turnNumber++;
         } else if (msg.role === 'assistant') {
             let cleanNarrative = msg.content.replace(/DATA_START([\s\S]*?)DATA_END/, '').trim();
@@ -348,10 +392,10 @@ function manualSave(slot) {
     if (!isConfirm) {
         return; 
     }
-    // 🛠️ 手动保存的一瞬间，正式解封锁定状态，并将当前指针与之绑定！
     currentSlot = slot;
-    localStorage.setItem(`ai_story_slot_${slot}`, JSON.stringify(chatHistory));
-    alert(`💾 进度已成功同步并锁定到槽位【${slot}】。此后在此局内的动作将自动增量存盘。`);
+    // 🛠️ 使用全新封装的模型绑定存储法
+    saveDataToLocalStorage(slot);
+    alert(`💾 进度已成功同步并锁定到槽位【${slot}】。此后在此局内的动作与 AI 切换都将自动增量存盘。`);
 }
 
 document.getElementById('back-menu-btn').addEventListener('click', () => {
