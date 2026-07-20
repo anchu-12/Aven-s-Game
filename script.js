@@ -4,7 +4,6 @@ let apiKey = "";
 let chatHistory = [];
 let currentSlot = null; 
 let isTyping = false; 
-// 全局模型默认变量
 let currentModel = "deepseek-v4-pro"; 
 
 const setupContainer = document.getElementById('setup-container');
@@ -43,11 +42,11 @@ function quickLoad(slot) {
     loadGameFromSlot(slot);
 }
 
-// 🛠️ 监听局内模型无缝切换
+// 🛠️ 监听局内模型无缝切换（严格对应 deepseek-v4-flash / deepseek-v4-pro）
 gameModelSelect.addEventListener('change', (e) => {
     currentModel = e.target.value;
     const modelLabel = currentModel === "deepseek-v4-pro" ? "DeepSeek Pro" : "DeepSeek Flash";
-    appendSystemMessage(`🤖 逻辑引擎已实时热切至：【${modelLabel}】（底层参数: ${currentModel}）。接下来的故事推演将以此核心计算！`);
+    appendSystemMessage(`🤖 逻辑引擎已实时热切至：【${modelLabel}】（底层标识: ${currentModel}）。接下来的故事推演将以此核心计算！`);
     
     if (currentSlot !== null) {
         saveDataToLocalStorage(currentSlot);
@@ -132,7 +131,7 @@ async function getAIResponse(loadingId, blockId = null) {
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: currentModel, // 明确：将 "deepseek-flash" 或 "deepseek-v4-pro" 原样发送给后端
+                model: currentModel, // 精确传入 deepseek-v4-flash 或 deepseek-v4-pro
                 messages: chatHistory,
                 temperature: 0.75
             })
@@ -140,7 +139,6 @@ async function getAIResponse(loadingId, blockId = null) {
 
         const data = await response.json();
 
-        // 🛡️ 拦截处理接口返回的错误结构
         if (data.error) {
             const errDetail = typeof data.error === 'object' ? (data.error.message || JSON.stringify(data.error)) : data.error;
             throw new Error(errDetail);
@@ -288,6 +286,8 @@ function loadGameFromSlot(slot) {
     if (parsed.history && parsed.model) {
         chatHistory = parsed.history;
         currentModel = parsed.model;
+        // 如果旧存档里带有不合规的废弃模型名，自动纠错修复
+        if (currentModel === "deepseek-flash") currentModel = "deepseek-v4-flash";
     } else {
         chatHistory = Array.isArray(parsed) ? parsed : [];
         currentModel = "deepseek-v4-pro";
