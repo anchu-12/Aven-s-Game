@@ -4,8 +4,8 @@ let apiKey = "";
 let chatHistory = [];
 let currentSlot = null; 
 let isTyping = false; 
-// 🛠️ 默认使用 DeepSeek 标准模型
-let currentModel = "deepseek-chat"; 
+// 全局模型默认变量
+let currentModel = "deepseek-v4-pro"; 
 
 const setupContainer = document.getElementById('setup-container');
 const gameContainer = document.getElementById('game-container');
@@ -43,11 +43,11 @@ function quickLoad(slot) {
     loadGameFromSlot(slot);
 }
 
-// 🛠️ 监听局内模型实时切换
+// 🛠️ 监听局内模型无缝切换
 gameModelSelect.addEventListener('change', (e) => {
     currentModel = e.target.value;
-    const modelLabel = currentModel === "deepseek-reasoner" ? "DeepSeek Reasoner (R1)" : "DeepSeek Chat (V3)";
-    appendSystemMessage(`🤖 逻辑引擎已实时热切至：【${modelLabel}】。接下来的故事推演将以此核心计算！`);
+    const modelLabel = currentModel === "deepseek-v4-pro" ? "DeepSeek Pro" : "DeepSeek Flash";
+    appendSystemMessage(`🤖 逻辑引擎已实时热切至：【${modelLabel}】（底层参数: ${currentModel}）。接下来的故事推演将以此核心计算！`);
     
     if (currentSlot !== null) {
         saveDataToLocalStorage(currentSlot);
@@ -100,7 +100,7 @@ DATA_START{"hp":"生命值数值","inv":"当前全部装备道具","loc":"当前
     gameContainer.style.display = 'block';
     storyDisplay.innerHTML = ""; 
 
-    const modelLabel = currentModel === "deepseek-reasoner" ? "Reasoner (R1)" : "Chat (V3)";
+    const modelLabel = currentModel === "deepseek-v4-pro" ? "Pro" : "Flash";
     const loadingId = appendSystemMessage(`⏳ 正在通过 [DeepSeek-${modelLabel}] 全速构建高精度游戏世界...`);
     await getAIResponse(loadingId);
 });
@@ -117,7 +117,7 @@ async function handlePlayerTurn() {
     const blockId = createStoryBlock(`> ${action}`);
     chatHistory.push({ role: "user", content: action });
     
-    const modelLabel = currentModel === "deepseek-reasoner" ? "Reasoner (R1)" : "Chat (V3)";
+    const modelLabel = currentModel === "deepseek-v4-pro" ? "Pro" : "Flash";
     const loadingId = appendSystemMessage(`⚡ [DeepSeek-${modelLabel}] 正在深度推演世界走向...`);
 
     await getAIResponse(loadingId, blockId);
@@ -132,16 +132,22 @@ async function getAIResponse(loadingId, blockId = null) {
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: currentModel,
+                model: currentModel, // 明确：将 "deepseek-flash" 或 "deepseek-v4-pro" 原样发送给后端
                 messages: chatHistory,
                 temperature: 0.75
             })
         });
 
         const data = await response.json();
-        
+
+        // 🛡️ 拦截处理接口返回的错误结构
         if (data.error) {
-            throw new Error(data.error.message || "API 调用遇到错误");
+            const errDetail = typeof data.error === 'object' ? (data.error.message || JSON.stringify(data.error)) : data.error;
+            throw new Error(errDetail);
+        }
+
+        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+            throw new Error("接口未返回有效的文本内容，请检查所选模型的兼容性。");
         }
 
         let rawContent = data.choices[0].message.content;
@@ -174,9 +180,9 @@ async function getAIResponse(loadingId, blockId = null) {
         }
 
     } catch (error) {
-        console.error(error);
+        console.error("AI 响应异常:", error);
         if (document.getElementById(loadingId)) {
-            document.getElementById(loadingId).innerText = `❌ 错误：${error.message || "请求失败，请检查网络或 Key 余额"}`;
+            document.getElementById(loadingId).innerText = `❌ 请求异常 [${currentModel}]: ${error.message}`;
         }
     }
 }
@@ -281,10 +287,10 @@ function loadGameFromSlot(slot) {
     
     if (parsed.history && parsed.model) {
         chatHistory = parsed.history;
-        currentModel = (parsed.model === "deepseek-flash" || parsed.model === "deepseek-v4-pro") ? "deepseek-chat" : parsed.model;
+        currentModel = parsed.model;
     } else {
         chatHistory = Array.isArray(parsed) ? parsed : [];
-        currentModel = "deepseek-chat";
+        currentModel = "deepseek-v4-pro";
     }
     
     gameModelSelect.value = currentModel;
@@ -311,7 +317,7 @@ function loadGameFromSlot(slot) {
     });
     
     refreshCollapsibleBlocks();
-    const modelLabel = currentModel === "deepseek-reasoner" ? "Reasoner (R1)" : "Chat (V3)";
+    const modelLabel = currentModel === "deepseek-v4-pro" ? "Pro" : "Flash";
     appendSystemMessage(`💾 成功跃迁回时空节点【${slot}】。已自动接轨模型：[${modelLabel}]。`);
 }
 
@@ -325,7 +331,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
     textOutput += `==================================================\n`;
     textOutput += `导出时间：${new Date().toLocaleString()}\n`;
     textOutput += `当前槽位：${currentSlot ? `进度【${currentSlot}】` : '临时新游戏（尚未手动存档）'}\n`;
-    textOutput += `采用引擎：${currentModel === 'deepseek-reasoner' ? 'DeepSeek Reasoner 深度推理版' : 'DeepSeek Chat 标准版'}\n`;
+    textOutput += `采用引擎：${currentModel === 'deepseek-v4-pro' ? 'DeepSeek Pro 深度推理版' : 'DeepSeek Flash 极速响应版'}\n`;
     textOutput += `--------------------------------------------------\n\n`;
 
     let turnNumber = 1;
