@@ -1,10 +1,24 @@
-const apiUrl = "https://api.deepseek.com/v1/chat/completions"; 
-
 let apiKey = "";
 let chatHistory = [];
 let currentSlot = null; 
 let isTyping = false; 
 let currentModel = "deepseek-v4-pro"; 
+
+// 动态获取当前模型的请求地址
+function getApiUrl(model) {
+    if (model.startsWith("gemini-")) {
+        return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+    }
+    return "https://api.deepseek.com/v1/chat/completions";
+}
+
+// 格式化模型名称显示
+function getModelLabel(model) {
+    if (model === "gemini-2.5-flash") return "Gemini 2.5 Flash";
+    if (model === "deepseek-v4-pro") return "DeepSeek Pro";
+    if (model === "deepseek-v4-flash") return "DeepSeek Flash";
+    return model;
+}
 
 const setupContainer = document.getElementById('setup-container');
 const gameContainer = document.getElementById('game-container');
@@ -42,10 +56,10 @@ function quickLoad(slot) {
     loadGameFromSlot(slot);
 }
 
-// 🛠️ 监听局内模型无缝切换（严格对应 deepseek-v4-flash / deepseek-v4-pro）
+// 🛠️ 监听局内模型无缝切换
 gameModelSelect.addEventListener('change', (e) => {
     currentModel = e.target.value;
-    const modelLabel = currentModel === "deepseek-v4-pro" ? "DeepSeek Pro" : "DeepSeek Flash";
+    const modelLabel = getModelLabel(currentModel);
     appendSystemMessage(`🤖 逻辑引擎已实时热切至：【${modelLabel}】（底层标识: ${currentModel}）。接下来的故事推演将以此核心计算！`);
     
     if (currentSlot !== null) {
@@ -65,7 +79,7 @@ startGameBtn.addEventListener('click', async () => {
     gameModelSelect.value = currentModel;
 
     if (!apiKey) {
-        alert("请输入你的 DeepSeek API Key 才能开始游戏！");
+        alert("请输入你的 API Key 才能开始游戏！");
         return;
     }
     localStorage.setItem('my_ai_game_key', apiKey);
@@ -99,8 +113,8 @@ DATA_START{"hp":"生命值数值","inv":"当前全部装备道具","loc":"当前
     gameContainer.style.display = 'block';
     storyDisplay.innerHTML = ""; 
 
-    const modelLabel = currentModel === "deepseek-v4-pro" ? "Pro" : "Flash";
-    const loadingId = appendSystemMessage(`⏳ 正在通过 [DeepSeek-${modelLabel}] 全速构建高精度游戏世界...`);
+    const modelLabel = getModelLabel(currentModel);
+    const loadingId = appendSystemMessage(`⏳ 正在通过 [${modelLabel}] 全速构建高精度游戏世界...`);
     await getAIResponse(loadingId);
 });
 
@@ -116,14 +130,15 @@ async function handlePlayerTurn() {
     const blockId = createStoryBlock(`> ${action}`);
     chatHistory.push({ role: "user", content: action });
     
-    const modelLabel = currentModel === "deepseek-v4-pro" ? "Pro" : "Flash";
-    const loadingId = appendSystemMessage(`⚡ [DeepSeek-${modelLabel}] 正在深度推演世界走向...`);
+    const modelLabel = getModelLabel(currentModel);
+    const loadingId = appendSystemMessage(`⚡ [${modelLabel}] 正在深度推演世界走向...`);
 
     await getAIResponse(loadingId, blockId);
 }
 
 async function getAIResponse(loadingId, blockId = null) {
     try {
+        const apiUrl = getApiUrl(currentModel);
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -131,7 +146,7 @@ async function getAIResponse(loadingId, blockId = null) {
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: currentModel, // 精确传入 deepseek-v4-flash 或 deepseek-v4-pro
+                model: currentModel,
                 messages: chatHistory,
                 temperature: 0.75
             })
@@ -286,7 +301,6 @@ function loadGameFromSlot(slot) {
     if (parsed.history && parsed.model) {
         chatHistory = parsed.history;
         currentModel = parsed.model;
-        // 如果旧存档里带有不合规的废弃模型名，自动纠错修复
         if (currentModel === "deepseek-flash") currentModel = "deepseek-v4-flash";
     } else {
         chatHistory = Array.isArray(parsed) ? parsed : [];
@@ -317,7 +331,7 @@ function loadGameFromSlot(slot) {
     });
     
     refreshCollapsibleBlocks();
-    const modelLabel = currentModel === "deepseek-v4-pro" ? "Pro" : "Flash";
+    const modelLabel = getModelLabel(currentModel);
     appendSystemMessage(`💾 成功跃迁回时空节点【${slot}】。已自动接轨模型：[${modelLabel}]。`);
 }
 
@@ -331,7 +345,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
     textOutput += `==================================================\n`;
     textOutput += `导出时间：${new Date().toLocaleString()}\n`;
     textOutput += `当前槽位：${currentSlot ? `进度【${currentSlot}】` : '临时新游戏（尚未手动存档）'}\n`;
-    textOutput += `采用引擎：${currentModel === 'deepseek-v4-pro' ? 'DeepSeek Pro 深度推理版' : 'DeepSeek Flash 极速响应版'}\n`;
+    textOutput += `采用引擎：${getModelLabel(currentModel)}\n`;
     textOutput += `--------------------------------------------------\n\n`;
 
     let turnNumber = 1;
