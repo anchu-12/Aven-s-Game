@@ -86,10 +86,12 @@ startGameBtn.addEventListener('click', async () => {
 
     currentSlot = null; 
 
+    // ✅ 已修复：将多条 system 消息彻底合并为唯一的一条 system，确保 Gemini 兼容性
     chatHistory = [
         {
             role: "system",
             content: `你是一个顶级的纯场景叙事NPC和文字游戏环境渲染器。
+
 【核心行动守则——玩家主导】：
 1. 剧情的发展速度必须完全掌控在玩家手中。你绝对不主动推动时间流逝或剧情大跨步，严禁主动宣布“任务完成”、“成功逃脱”或直接转场。
 2. 玩家做出一个动作，你只细腻、生动、富有文学张力地描绘这一个动作带来的实时环境改变、声音、光影及NPC的实时反应。
@@ -101,11 +103,14 @@ startGameBtn.addEventListener('click', async () => {
 
 【状态面板数据同步规则】：
 在每次回复的最末尾，你必须严格按照以下格式附带一行数据（不要更改标签名字），用于更新网页顶部的状态栏。请根据剧情合理扣除或增加属性：
-DATA_START{"hp":"生命值数值","inv":"当前全部装备道具","loc":"当前精准位置"}DATA_END`
-        },
-        {
-            role: "system",
-            content: `【当前游戏剧本设定】\n世界观：${worldSetting}\n主角设定：${charSetting}\n主线大方向：${plotSetting}\n\n请以此生成精彩的第一章开场白，描绘开局场景，不要给选项。并在末尾附带初始 DATA 数据。`
+DATA_START{"hp":"生命值数值","inv":"当前全部装备道具","loc":"当前精准位置"}DATA_END
+
+【当前游戏剧本设定】
+世界观：${worldSetting}
+主角设定：${charSetting}
+主线大方向：${plotSetting}
+
+请以此生成精彩的第一章开场白，描绘开局场景，不要给选项。并在末尾附带初始 DATA 数据。`
         }
     ];
 
@@ -139,17 +144,24 @@ async function handlePlayerTurn() {
 async function getAIResponse(loadingId, blockId = null) {
     try {
         const apiUrl = getApiUrl(currentModel);
+        
+        // ✅ 已修复：避免给 Gemini 传不支持的非标准字段，提升请求成功率
+        const requestBody = {
+            model: currentModel,
+            messages: chatHistory
+        };
+
+        if (!currentModel.startsWith("gemini-")) {
+            requestBody.temperature = 0.7;
+        }
+
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
             },
-            body: JSON.stringify({
-                model: currentModel,
-                messages: chatHistory,
-                temperature: 0.75
-            })
+            body: JSON.stringify(requestBody)
         });
 
         const data = await response.json();
@@ -160,7 +172,7 @@ async function getAIResponse(loadingId, blockId = null) {
         }
 
         if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-            throw new Error("接口未返回有效的文本内容，请检查所选模型的兼容性。");
+            throw new Error("接口未返回有效的文本内容，请检查所选模型的兼容性或 API Key 权限。");
         }
 
         let rawContent = data.choices[0].message.content;
@@ -336,7 +348,7 @@ function loadGameFromSlot(slot) {
 }
 
 document.getElementById('export-btn').addEventListener('click', () => {
-    if (!chatHistory || chatHistory.length <= 2) {
+    if (!chatHistory || chatHistory.length <= 1) {
         return alert("当前还没有可导出的冒险历史！");
     }
 
@@ -391,7 +403,7 @@ document.getElementById('copy-text-btn').addEventListener('click', () => {
     textarea.setSelectionRange(0, 99999); 
     try {
         document.execCommand('copy');
-        alert('✨ 剧情文本已全选并成功复制到你的手机剪贴板！可以直接去粘贴保存啦。');
+        alert('✨ 剧情文本已全选并成功复制到你的剪贴板！');
     } catch (err) {
         alert('请长按文本框内的文字进行手动全选复制。');
     }
@@ -406,13 +418,13 @@ document.getElementById('save-btn-2').addEventListener('click', () => { manualSa
 document.getElementById('save-btn-3').addEventListener('click', () => { manualSave(3); });
 
 function manualSave(slot) {
-    const isConfirm = confirm(`⚠️ 覆盖确认：\n你确定要将当前最新的游戏进度，覆盖并保存到【进度 ${slot}】吗？这将会抹除该槽位先前的历史旧数据！`);
+    const isConfirm = confirm(`⚠️ 覆盖确认：\n你确定要将当前最新的游戏进度，覆盖并保存到【进度 ${slot}】吗？`);
     if (!isConfirm) {
         return; 
     }
     currentSlot = slot;
     saveDataToLocalStorage(slot);
-    alert(`💾 进度已成功同步并锁定到槽位【${slot}】。此后在此局内的动作与 AI 切换都将自动增量存盘。`);
+    alert(`💾 进度已成功同步并锁定到槽位【${slot}】。`);
 }
 
 document.getElementById('back-menu-btn').addEventListener('click', () => {
