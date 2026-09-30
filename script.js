@@ -1,6 +1,6 @@
 // ============================================================
 // AI 文字冒险引擎 Ultra Pro
-// Gemini 3.6 Flash + DeepSeek + OpenRouter (Venice Uncensored)
+// Gemini 3.6 Flash + DeepSeek + OpenRouter (Venice + Grok 4.3)
 // ============================================================
 
 // ------------------------------------------------------------
@@ -85,6 +85,9 @@ function getModelLabel(model) {
 
         case "cognitivecomputations/dolphin-mistral-24b-venice-edition":
             return "Venice Uncensored (OpenRouter)";
+
+        case "x-ai/grok-4.3":
+            return "Grok 4.3 (OpenRouter)";
 
         default:
             return model;
@@ -2268,7 +2271,7 @@ console.log(
 );
 
 console.log(
-    "Gemini / DeepSeek / OpenRouter (Venice Uncensored) API Engine Loaded"
+    "Gemini / DeepSeek / OpenRouter (Venice + Grok 4.3) API Engine Loaded"
 );
 
 console.log(
