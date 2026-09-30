@@ -1,6 +1,6 @@
 // ============================================================
 // AI 文字冒险引擎 Ultra Pro
-// Gemini 3.6 Flash + DeepSeek
+// Gemini 3.6 Flash + DeepSeek + OpenRouter (GLM)
 // ============================================================
 
 // ------------------------------------------------------------
@@ -41,6 +41,11 @@ function isGeminiModel(model) {
            model.toLowerCase().startsWith("gemini-");
 }
 
+function isOpenRouterModel(model) {
+    return typeof model === "string" &&
+           (model.startsWith("z-ai/") || model.startsWith("openrouter/"));
+}
+
 
 // ============================================================
 // API 地址
@@ -49,11 +54,14 @@ function isGeminiModel(model) {
 function getApiUrl(model) {
 
     if (isGeminiModel(model)) {
-
         return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-
     }
 
+    if (isOpenRouterModel(model)) {
+        return "https://openrouter.ai/api/v1/chat/completions";
+    }
+
+    // 默认走 DeepSeek
     return "https://api.deepseek.com/v1/chat/completions";
 }
 
@@ -74,6 +82,12 @@ function getModelLabel(model) {
 
         case "deepseek-v4-flash":
             return "DeepSeek Flash";
+
+        case "z-ai/glm-5.3-flashx":
+            return "GLM 5.3 FlashX (OpenRouter)";
+
+        case "z-ai/glm-5.3-flash":
+            return "GLM 5.3 Flash (OpenRouter)";
 
         default:
             return model;
@@ -141,7 +155,7 @@ window.quickLoad = function (slot) {
     if (!key) {
 
         alert(
-            "请输入你的 Gemini 或 DeepSeek API Key。"
+            "请输入你的 Gemini / DeepSeek / OpenRouter API Key。"
         );
 
         return;
@@ -598,7 +612,7 @@ async function getAIResponse(
 
 
         // ----------------------------------------------------
-        // DeepSeek 参数
+        // DeepSeek / OpenRouter 参数
         //
         // Gemini 3.6 Flash 不添加 temperature。
         // ----------------------------------------------------
@@ -622,6 +636,12 @@ async function getAIResponse(
                 `Bearer ${apiKey}`
 
         };
+
+        // OpenRouter 推荐附加头
+        if (isOpenRouterModel(currentModel)) {
+            headers["HTTP-Referer"] = "https://ai-text-adventure.local";
+            headers["X-Title"] = "AI Text Adventure Engine";
+        }
 
 
         // ----------------------------------------------------
@@ -2251,7 +2271,7 @@ console.log(
 );
 
 console.log(
-    "Gemini / DeepSeek API Engine Loaded"
+    "Gemini / DeepSeek / OpenRouter (GLM) API Engine Loaded"
 );
 
 console.log(
@@ -2262,6 +2282,11 @@ console.log(
 console.log(
     "Gemini Endpoint:",
     "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+);
+
+console.log(
+    "OpenRouter Endpoint:",
+    "https://openrouter.ai/api/v1/chat/completions"
 );
 
 console.log(
