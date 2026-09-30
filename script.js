@@ -1,6 +1,6 @@
 // ============================================================
 // AI 文字冒险引擎 Ultra Pro
-// Gemini 3.6 Flash + DeepSeek + OpenRouter (GLM)
+// Gemini 3.6 Flash + DeepSeek + OpenRouter (Venice Uncensored)
 // ============================================================
 
 // ------------------------------------------------------------
@@ -42,8 +42,8 @@ function isGeminiModel(model) {
 }
 
 function isOpenRouterModel(model) {
-    return typeof model === "string" &&
-           (model.startsWith("z-ai/") || model.startsWith("openrouter/"));
+    // 只要模型名里带斜杠，就走 OpenRouter（Venice、Grok 等）
+    return typeof model === "string" && model.includes("/");
 }
 
 
@@ -83,11 +83,8 @@ function getModelLabel(model) {
         case "deepseek-v4-flash":
             return "DeepSeek Flash";
 
-        case "z-ai/glm-5.3-flashx":
-            return "GLM 5.3 FlashX (OpenRouter)";
-
-        case "z-ai/glm-5.3-flash":
-            return "GLM 5.3 Flash (OpenRouter)";
+        case "cognitivecomputations/dolphin-mistral-24b-venice-edition":
+            return "Venice Uncensored (OpenRouter)";
 
         default:
             return model;
@@ -2271,7 +2268,7 @@ console.log(
 );
 
 console.log(
-    "Gemini / DeepSeek / OpenRouter (GLM) API Engine Loaded"
+    "Gemini / DeepSeek / OpenRouter (Venice Uncensored) API Engine Loaded"
 );
 
 console.log(
